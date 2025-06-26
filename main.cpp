@@ -84,7 +84,7 @@ int main() {
         std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
     }
     // fragment shader
-    std::string fragmentShaderContents = loadShaderFromFile("fragment.frag");
+    std::string fragmentShaderContents = loadShaderFromFile("../fragment.frag");
     const char *fragmentShaderSource = fragmentShaderContents.c_str();
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
