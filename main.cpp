@@ -1,11 +1,15 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <GL/gl.h>
 
 #include <numbers>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <chrono>
+#include <vector>
 
 /*
  * Disclaimer: boilerplate to render two triangles on the screen
@@ -16,8 +20,11 @@ void processInput(GLFWwindow *window);
 
 // settings
 const float FOV = 90.0f;
+const float VIEWPORT_DIST = 1.0f;
+const unsigned int RAY_BOUNCES = 5;
+const unsigned int RAYS_PER_PIXEL = 5;
 
-const char *vertexShaderSource = "#version 330 core\n"
+const char *vertexShaderSource = "#version 430 core\n"
                                  "layout (location = 0) in vec3 aPos;\n"
                                  "void main()\n"
                                  "{\n"
@@ -36,19 +43,26 @@ std::string loadShaderFromFile(const std::string& filePath) {
     return shaderStream.str();
 }
 
+// Utility function for error checking
+void checkGLError(const char* label) {
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "[OpenGL Error] (" << err << ") at " << label << std::endl;
+        // Optionally, decode err to a string
+    }
+}
+
 
 int main() {
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+    std::cout.tie(nullptr);
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
-
     // glfw window creation
     // --------------------
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
@@ -139,33 +153,78 @@ int main() {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    glBindVertexArray(0);
+    // Building internal triangle and vertex buffers
+    std::vector<glm::vec4> triangleVertices = {
+            {-1.0f, 1.0f, 8.0f, 1.0f},
+            {1.0f, 1.0f, 10.0f, 1.0f},
+            {0.0f, -1.0f, 10.0f, 1.0f},
+    };
+    unsigned int vertexSSBO;
+    glGenBuffers(1, &vertexSSBO);
+    checkGLError("(183) glGenBuffers");
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexSSBO);
+    checkGLError("glBindBuffer");
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+                 triangleVertices.size() * sizeof(glm::vec4),
+                 triangleVertices.data(),
+                 GL_STATIC_DRAW);
+    checkGLError("glBufferData");
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vertexSSBO); // Bind to binding = 0
+    checkGLError("glBindBufferBase");
+    std::vector<glm::uvec4> triangles = {
+            {0, 1, 2, 0},
+    };
+    unsigned int triangleSSBO;
+    glGenBuffers(1, &triangleSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+                 triangles.size() * sizeof(glm::uvec4),
+                 triangles.data(),
+                 GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, triangleSSBO); // Bind to binding = 1
+    checkGLError("glBindBufferBase");
+    // Static constants cast to float
+    auto u_screenWidth = static_cast<GLfloat>(mode->width);
+    auto u_screenHeight = static_cast<GLfloat>(mode->height);
+    auto u_FOV = static_cast<GLfloat>(FOV * std::numbers::pi / 180.f);
 
     // render loop
     // -----------
+    int frameCount = 0;
+    double startTime = glfwGetTime();
+    checkGLError("Pre-render-loop");
     while (!glfwWindowShouldClose(window)) {
         // input
         // -----
         processInput(window);
-
+        checkGLError("After process input");
         // render
         // ------
+        glUseProgram(shaderProgram);
         glUniform1f(
                 glGetUniformLocation(shaderProgram, "u_ScreenWidth"),
-                static_cast<GLfloat>(mode->width));
+                u_screenWidth);
         glUniform1f(
                 glGetUniformLocation(shaderProgram, "u_ScreenHeight"),
-                static_cast<GLfloat>(mode->height));
+                u_screenHeight);
         glUniform1f(glGetUniformLocation(shaderProgram, "u_FOV"),
-                    static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
+                    u_FOV);
+        glUniform1f(glGetUniformLocation(shaderProgram, "u_ViewportDist"),
+                    VIEWPORT_DIST);
+        glUniform1ui(glGetUniformLocation(shaderProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
+        glUniform1ui(glGetUniformLocation(shaderProgram, "u_RayBounces"), RAY_BOUNCES);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
+        frameCount++;
+        if (glfwGetTime() - startTime >= 1.0) {
+            std::cout << "FPS: " << frameCount << "\n";
+            frameCount = 0;
+            startTime += 1.0;
+        }
     }
 
     glDeleteVertexArrays(1, &VAO);
