@@ -15,6 +15,10 @@ layout(std430, binding = 1) buffer TriangleBuffer {
     uvec4 triangles[];
 };
 
+layout(std430, binding = 2) buffer NormalsBuffer {
+    vec4 triangleNormals[];
+};
+
 const float EPS = 1e-3;
 
 #define WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
@@ -24,7 +28,7 @@ bool intersectsTriangle(vec3 origin, vec3 dir, int triangleIndex) {
     vec3 a = vertices[triangles[triangleIndex].x].xyz;
     vec3 b = vertices[triangles[triangleIndex].y].xyz;
     vec3 c = vertices[triangles[triangleIndex].z].xyz;
-    vec3 n = cross(a - b, a - c);
+    vec3 n = triangleNormals[triangleIndex].xyz;
     // ((origin + alpha * dir) - a) dot n = 0
     // (origin + alpha * dir) dot n = a dot n
     // alpha * dir dot n  = (a - origin) dot n
