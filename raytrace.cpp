@@ -9,6 +9,8 @@
 #include "constants.h"
 #include "util.h"
 
+#define WORKGROUP_SIZE 16
+
 static GLuint raytraceProgram;
 static std::vector<glm::vec4> triangleVertices, triangleNormals;
 static std::vector<glm::uvec4> triangles;
@@ -84,8 +86,8 @@ void raytraceInit() {
                 VIEWPORT_DIST);
     glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
     glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
-    groups_x = (screenWidth + 16 - 1) / 16;
-    groups_y = (screenHeight + 16 - 1) / 16;
+    groups_x = (screenWidth + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+    groups_y = (screenHeight + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 };
 
 void raytrace() {
