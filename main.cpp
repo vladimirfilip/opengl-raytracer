@@ -2,15 +2,11 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include <numbers>
 #include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
 
-#define VERTEX_SSBO_BINDING 0
-#define TRIANGLE_SSBO_BINDING 1
-#define TRIANGLE_NORMAL_SSBO_BINDING 2
+#include "util.h"
+#include "raytrace.h"
+#include "constants.h"
 
 /*
  * Disclaimer: boilerplate to render two triangles on the screen
@@ -18,72 +14,6 @@
  */
 
 void processInput(GLFWwindow *window);
-
-// settings
-const float FOV = 90.0f;
-const float VIEWPORT_DIST = 1.0f;
-const unsigned int RAY_BOUNCES = 5;
-const unsigned int RAYS_PER_PIXEL = 5;
-
-std::string loadShaderCodeFromFile(const std::string& filePath) {
-    std::ifstream shaderFile(filePath);
-    if (!shaderFile.is_open()) {
-        throw std::runtime_error("Failed to open shader file: " + filePath);
-    }
-
-    std::ostringstream shaderStream;
-    shaderStream << shaderFile.rdbuf();
-
-    return shaderStream.str();
-}
-
-GLuint importAndCompileShader(const std::string& path, GLenum shaderType) {
-    std::string shaderCode = loadShaderCodeFromFile(path);
-    const char *shaderSource = shaderCode.c_str();
-    GLuint shader = glCreateShader(shaderType);
-    glShaderSource(shader, 1, &shaderSource, nullptr);
-    glCompileShader(shader);
-    int success;
-    char infoLog[512];
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        std::cout << "ERROR::" + std::to_string(shaderType) + "::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    return shader;
-}
-
-// Utility function for error checking
-void checkGLError(const std::string& label) {
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "[OpenGL Error] (" << err << ") at " << label << std::endl;
-    }
-}
-
-template <typename T>
-void initSSBO(std::vector<T>& data, unsigned int binding, unsigned int* ssbo) {
-    glGenBuffers(1, ssbo);
-    checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glGenBuffers");
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, *ssbo);
-    checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBuffer");
-    glBufferData(GL_SHADER_STORAGE_BUFFER,
-                 data.size() * sizeof(T),
-                 data.data(),
-                 GL_STATIC_DRAW);
-    checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBufferData");
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, *ssbo);
-    checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBufferBase");
-}
-
-void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num_groups_z) {
-    GLuint program = glCreateProgram();
-    glAttachShader(program, shader);
-    glLinkProgram(program);
-    glUseProgram(program);
-    glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
-    glDeleteProgram(program);
-}
 
 int main() {
     std::ios_base::sync_with_stdio(false);
@@ -147,77 +77,42 @@ int main() {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    // Building internal triangle and vertex buffers
-    std::vector<glm::vec4> triangleVertices = {
-            {-1.0f, 1.0f, 10.0f, 1.0f},
-            {1.0f, 1.0f, 10.0f, 1.0f},
-            {0.0f, -1.0f, 10.0f, 1.0f},
-            {3.0f, 1.0f, 10.0f, 1.0f},
-            {5.0f, 1.0f, 7.0f, 1.0f},
-            {4.0f, -1.0f, 8.0f, 1.0f},
-            {-3.0f, 1.0f, 10.0f, 1.0f},
-            {-5.0f, 1.0f, 7.0f, 1.0f},
-            {-4.0f, -1.0f, 8.0f, 1.0f},
-    };
-    unsigned int vertexSSBO;
-    initSSBO(triangleVertices, VERTEX_SSBO_BINDING, &vertexSSBO);
-    std::vector<glm::uvec4> triangles = {
-            {0, 1, 2, 0},
-            {3, 4, 5, 0},
-            {6, 7, 8, 0},
-    };
-    initSSBO(triangles, TRIANGLE_SSBO_BINDING, &vertexSSBO);
-    unsigned int triangleNormalsSSBO;
-    std::vector<glm::vec4> triangleNormals(triangles.size());
-    initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING, &triangleNormalsSSBO);
-    GLuint normalShader = importAndCompileShader("../normals.glsl", GL_COMPUTE_SHADER);
-    runComputeShader(normalShader, triangles.size(), 1, 1);
-    // Static constants cast to float
-    auto u_screenWidth = static_cast<GLfloat>(mode->width);
-    auto u_screenHeight = static_cast<GLfloat>(mode->height);
-    auto u_FOV = static_cast<GLfloat>(FOV * std::numbers::pi / 180.f);
-
     // link shaders
-    GLuint drawCallProgram = glCreateProgram();
-    glAttachShader(drawCallProgram, vertexShader);
-    glAttachShader(drawCallProgram, fragmentShader);
-    glLinkProgram(drawCallProgram);
-    int success;
-    char infoLog[512];
-    // check for linking errors
-    glGetProgramiv(drawCallProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(drawCallProgram, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    GLuint drawCallProgram = generateProgram(vertexShader, fragmentShader);
     glUseProgram(drawCallProgram);
-    glUniform1f(
-            glGetUniformLocation(drawCallProgram, "u_ScreenWidth"),
-            u_screenWidth);
-    glUniform1f(
-            glGetUniformLocation(drawCallProgram, "u_ScreenHeight"),
-            u_screenHeight);
-    glUniform1f(glGetUniformLocation(drawCallProgram, "u_FOV"),
-                u_FOV);
-    glUniform1f(glGetUniformLocation(drawCallProgram, "u_ViewportDist"),
-                VIEWPORT_DIST);
-    glUniform1ui(glGetUniformLocation(drawCallProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
-    glUniform1ui(glGetUniformLocation(drawCallProgram, "u_RayBounces"), RAY_BOUNCES);
+    GLuint outputTex;
+    glGenTextures(1, &outputTex);
+    glBindTexture(GL_TEXTURE_2D, outputTex);
+    checkGLError("(main) glGenTextures");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+                 mode->width, mode->height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindImageTexture(PIXEL_OUTPUT_BINDING,
+                       outputTex,
+                       0,
+                       GL_FALSE,
+                       0,
+                       GL_WRITE_ONLY,
+                       GL_RGBA32F); // unit 0
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(drawCallProgram, "outputTexture"), 0);
 
+    raytraceInit();
     // render loop
     // -----------
     int frameCount = 0;
     double startTime = glfwGetTime();
-    checkGLError("Pre-render-loop");
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
-        checkGLError("After process input");
+        raytrace();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glUseProgram(drawCallProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         glfwSwapBuffers(window);
         glfwPollEvents();
         frameCount++;
+        checkGLError("(main) glDrawElements");
     }
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);

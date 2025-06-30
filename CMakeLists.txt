@@ -5,8 +5,14 @@ include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(opengl_raytracer main.cpp
-        third_party/glad/src/glad.c)
+add_executable(opengl_raytracer
+        third_party/glad/src/glad.c
+        constants.h
+        util.cpp
+        util.h
+        raytrace.cpp
+        raytrace.h
+        main.cpp)
 
 FetchContent_Declare(
         glm
