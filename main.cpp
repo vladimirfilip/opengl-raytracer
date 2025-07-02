@@ -44,8 +44,8 @@ int main() {
         return -1;
     }
 
-    GLuint vertexShader = importAndCompileShader("../vertex.vert", GL_VERTEX_SHADER);
-    GLuint fragmentShader = importAndCompileShader("../fragment.frag", GL_FRAGMENT_SHADER);
+    GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
+    GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
 
     // set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------

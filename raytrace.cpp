@@ -13,9 +13,6 @@
 #define WORKGROUP_SIZE 16
 
 static GLuint raytraceProgram;
-static std::vector<glm::vec4> triangleVertices, triangleNormals;
-static std::vector<glm::uvec4> triangles;
-static int screenWidth, screenHeight;
 static GLuint groups_x, groups_y;
 
 template <typename T>
@@ -47,21 +44,21 @@ void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num
 void raytraceInit() {
     // Building internal triangle and vertex buffers
     ObjContents *contents = readObjContents("../model.obj");
-    triangleVertices = contents->vertices;
+    std::vector<glm::vec4> triangleVertices = contents->vertices;
     initSSBO(triangleVertices, VERTEX_SSBO_BINDING);
-    triangles = contents->triangles;
+    std::vector<glm::uvec4> triangles = contents->triangles;
     initSSBO(triangles, TRIANGLE_SSBO_BINDING);
     free(contents);
-    triangleNormals = std::vector<glm::vec4>(triangles.size());
+    std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
-    GLuint normalShader = importAndCompileShader("../normals.glsl", GL_COMPUTE_SHADER);
+    GLuint normalShader = importAndCompileShader("../shaders/normals.glsl", GL_COMPUTE_SHADER);
     runComputeShader(normalShader, (int) triangles.size(), 1, 1);
     // Static constants cast to float
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    screenWidth = mode->width;
-    screenHeight = mode->height;
-    raytraceProgram = generateProgram(importAndCompileShader("../raytrace.glsl", GL_COMPUTE_SHADER));
+    const int screenWidth = mode->width;
+    const int screenHeight = mode->height;
+    raytraceProgram = generateProgram(importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER));
     glUseProgram(raytraceProgram);
     glUniform1f(
             glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
