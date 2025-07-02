@@ -36,7 +36,7 @@ bool intersectsTriangle(vec3 origin, vec3 dir, int triangleIndex) {
     vec3 n = triangleNormals[triangleIndex].xyz;
     float denom = dot(dir, n);
     if (abs(denom) < EPS)
-    return false;
+        return false;
     float alpha = dot(a - origin, n) / denom;
     if (alpha <= EPS)
         return false;

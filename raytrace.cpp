@@ -8,6 +8,7 @@
 
 #include "constants.h"
 #include "util.h"
+#include "obj-reader.h"
 
 #define WORKGROUP_SIZE 16
 
@@ -45,24 +46,12 @@ void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num
 
 void raytraceInit() {
     // Building internal triangle and vertex buffers
-    triangleVertices = {
-            {-1.0f, 1.0f, 10.0f, 1.0f},
-            {1.0f, 1.0f, 10.0f, 1.0f},
-            {0.0f, -1.0f, 10.0f, 1.0f},
-            {3.0f, 1.0f, 10.0f, 1.0f},
-            {5.0f, 1.0f, 7.0f, 1.0f},
-            {4.0f, -1.0f, 8.0f, 1.0f},
-            {-3.0f, 1.0f, 10.0f, 1.0f},
-            {-5.0f, 1.0f, 7.0f, 1.0f},
-            {-4.0f, -1.0f, 8.0f, 1.0f},
-    };
+    ObjContents *contents = readObjContents("../model.obj");
+    triangleVertices = contents->vertices;
     initSSBO(triangleVertices, VERTEX_SSBO_BINDING);
-    triangles = {
-            {0, 1, 2, 0},
-            {3, 4, 5, 0},
-            {6, 7, 8, 0},
-    };
+    triangles = contents->triangles;
     initSSBO(triangles, TRIANGLE_SSBO_BINDING);
+    free(contents);
     triangleNormals = std::vector<glm::vec4>(triangles.size());
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
     GLuint normalShader = importAndCompileShader("../normals.glsl", GL_COMPUTE_SHADER);
