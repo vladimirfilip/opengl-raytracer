@@ -12,10 +12,11 @@
 #include "util.h"
 #include "obj-reader.h"
 
-#define WORKGROUP_SIZE 16
+#define WORKGROUP_SIZE 32
 
 static GLuint raytraceProgram;
 static GLuint groups_x, groups_y;
+static int screenWidth, screenHeight;
 
 template<typename T>
 void initSSBO(std::vector<T> &data, unsigned int binding) {
@@ -55,8 +56,8 @@ void raytraceInit() {
     // Static constants cast to float
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    const int screenWidth = mode->width;
-    const int screenHeight = mode->height;
+    screenWidth = mode->width;
+    screenHeight = mode->height;
     raytraceProgram = generateProgram(
             importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER));
     glUseProgram(raytraceProgram);
@@ -73,9 +74,12 @@ void raytraceInit() {
     groups_y = (screenHeight + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 };
 
-void raytrace(glm::vec3 cameraPos) {
+void raytrace(glm::vec3 cameraPos, double mouseX, double mouseY) {
     glUseProgram(raytraceProgram);
+    double mouseRotationY = -(((int) mouseX - screenWidth / 2) % (screenWidth * 2)) * (std::numbers::pi / screenWidth);
+    double mouseRotationX = -(((int) mouseY - screenHeight / 2) % (screenHeight * 2)) * (std::numbers::pi / screenHeight);
     glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
                 cameraPos.z);
+    glUniform2f(glGetUniformLocation(raytraceProgram, "cameraRotation"), mouseRotationX, mouseRotationY);
     glDispatchCompute(groups_x, groups_y, 1);
 }

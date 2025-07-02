@@ -4,6 +4,6 @@
 #include "glm/vec3.hpp"
 
 extern void raytraceInit();
-extern void raytrace(glm::vec3 cameraPos);
+extern void raytrace(glm::vec3 cameraPos, double mouseX, double mouseY);
 
 #endif //OPENGL_RAYTRACER_RAYTRACE_H

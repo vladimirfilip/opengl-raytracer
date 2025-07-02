@@ -14,8 +14,29 @@
  */
 
 static glm::vec3 cameraPos(0.0f, 0.0f, 0.0f);
+static glm::mat3 cameraRotation;
 
 void processInput(GLFWwindow *window, double &deltaTime);
+
+static void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos) {
+    std::cout << "Position: (" << xpos << ", " << ypos << ")\n";
+}
+
+static void updateCameraRotation(float mouseX, float mouseY, int screenWidth, int screenHeight) {
+    double mouseRotationY = -(((int) mouseX - screenWidth / 2) % (screenWidth * 2)) * (std::numbers::pi / screenWidth);
+    double mouseRotationX = -(((int) mouseY - screenHeight / 2) % (screenHeight * 2)) * (std::numbers::pi / screenHeight);
+    glm::mat3 xRotation = glm::mat3(
+            1.0f, 0.0f, 0.0f,
+            0.0f, cos(mouseRotationX), -sin(mouseRotationX),
+            0.0f, sin(mouseRotationX), cos(mouseRotationX)
+    );
+    glm::mat3 yRotation = glm::mat3(
+            cos(mouseRotationY), 0.0f, sin(mouseRotationY),
+            0.0f, 1.0f, 0.0f,
+            -sin(mouseRotationY), 0.0f, cos(mouseRotationY)
+    );
+    cameraRotation = yRotation * xRotation;
+}
 
 int main() {
     std::ios_base::sync_with_stdio(false);
@@ -46,6 +67,9 @@ int main() {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, cursorPositionCallback);
 
     GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
     GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
@@ -106,8 +130,11 @@ int main() {
         double currTime = glfwGetTime();
         deltaTime = currTime - prevTime;
         prevTime = currTime;
+        double mouseX, mouseY;
+        glfwGetCursorPos(window, &mouseX, &mouseY);
+        updateCameraRotation(mouseX, mouseY, mode->width, mode->height);
         processInput(window, deltaTime);
-        raytrace(cameraPos);
+        raytrace(cameraPos, mouseX, mouseY);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glUseProgram(drawCallProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
@@ -129,11 +156,11 @@ void processInput(GLFWwindow *window, double &deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        cameraPos.z += CAMERA_MOVE_SPEED * deltaTime;
+        cameraPos += cameraRotation * glm::vec3(0.0f, 0.0f, CAMERA_MOVE_SPEED * deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        cameraPos.z -= CAMERA_MOVE_SPEED * deltaTime;
+        cameraPos += cameraRotation * glm::vec3(0.0f, 0.0f, -CAMERA_MOVE_SPEED * deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        cameraPos.x -= CAMERA_MOVE_SPEED * deltaTime;
+        cameraPos += cameraRotation * glm::vec3(-CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        cameraPos.x += CAMERA_MOVE_SPEED * deltaTime;
+        cameraPos += cameraRotation * glm::vec3(CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
 }

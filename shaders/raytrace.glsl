@@ -1,6 +1,6 @@
 #version 430
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 uniform float u_ScreenWidth;
 uniform float u_ScreenHeight;
@@ -9,6 +9,7 @@ uniform float u_ViewportDist;
 uniform uint u_RayBounces;
 uniform uint u_RaysPerPixel;
 uniform vec3 cameraPos;
+uniform vec2 cameraRotation;
 
 layout(std430, binding = 0) buffer VertexBuffer {
     vec4 vertices[];
@@ -69,9 +70,21 @@ void main() {
         (float(gl_GlobalInvocationID.y) - u_ScreenHeight / 2.0f) * pixelWidth,
         u_ViewportDist
     );
+    mat3 xRotation = mat3(
+        1.0f, 0.0f, 0.0f,
+        0.0f, cos(cameraRotation.x), -sin(cameraRotation.x),
+        0.0f, sin(cameraRotation.x), cos(cameraRotation.x)
+    );
+    mat3 yRotation = mat3(
+        cos(cameraRotation.y), 0.0f, sin(cameraRotation.y),
+        0.0f, 1.0f, 0.0f,
+        -sin(cameraRotation.y), 0.0f, cos(cameraRotation.y)
+    );
+    vec3 rotatedDir = yRotation * xRotation * dir;
+    vec3 rayOrigin = cameraPos + rotatedDir;
     vec4 colour = BLACK;
     for (uint i = uint(0); i < u_RaysPerPixel; i++) {
-        colour += castRay(cameraPos + dir, dir, u_RayBounces);
+        colour += castRay(rayOrigin, rotatedDir, u_RayBounces);
     }
     colour /= u_RaysPerPixel;
     imageStore(pixelOutput, ivec2(gl_GlobalInvocationID.xy), colour);
