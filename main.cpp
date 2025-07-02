@@ -13,7 +13,9 @@
  * is imported from https://learnopengl.com/Getting-started/Hello-Triangle
  */
 
-void processInput(GLFWwindow *window);
+static glm::vec3 cameraPos(0.0f, 0.0f, 0.0f);
+
+void processInput(GLFWwindow *window, double &deltaTime);
 
 int main() {
     std::ios_base::sync_with_stdio(false);
@@ -29,7 +31,8 @@ int main() {
     // --------------------
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    GLFWwindow *window = glfwCreateWindow(mode->width, mode->height, "opengl raytracer", monitor, nullptr);
+    GLFWwindow *window = glfwCreateWindow(mode->width, mode->height, "opengl raytracer", monitor,
+                                          nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -49,11 +52,10 @@ int main() {
 
     // set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    float vertices[] = {
-            1.0f, 1.0f, 0.0f,  // top right
-            1.0f, -1.0f, 0.0f,  // bottom right
-            -1.0f, -1.0f, 0.0f,  // bottom left
-            -1.0f, 1.0f, 0.0f   // top left
+    float vertices[] = {1.0f, 1.0f, 0.0f,  // top right
+                        1.0f, -1.0f, 0.0f,  // bottom right
+                        -1.0f, -1.0f, 0.0f,  // bottom left
+                        -1.0f, 1.0f, 0.0f   // top left
     };
     unsigned int indices[] = {  // note that we start from 0!
             0, 1, 3,  // first Triangle
@@ -84,16 +86,11 @@ int main() {
     glGenTextures(1, &outputTex);
     glBindTexture(GL_TEXTURE_2D, outputTex);
     checkGLError("(main) glGenTextures");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
-                 mode->width, mode->height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mode->width, mode->height, 0, GL_RGBA, GL_FLOAT,
+                 nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glBindImageTexture(PIXEL_OUTPUT_BINDING,
-                       outputTex,
-                       0,
-                       GL_FALSE,
-                       0,
-                       GL_WRITE_ONLY,
+    glBindImageTexture(PIXEL_OUTPUT_BINDING, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,
                        GL_RGBA32F); // unit 0
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(drawCallProgram, "outputTexture"), 0);
@@ -103,9 +100,14 @@ int main() {
     // -----------
     int frameCount = 0;
     double startTime = glfwGetTime();
+    double prevTime = startTime;
+    double deltaTime;
     while (!glfwWindowShouldClose(window)) {
-        processInput(window);
-        raytrace();
+        double currTime = glfwGetTime();
+        deltaTime = currTime - prevTime;
+        prevTime = currTime;
+        processInput(window, deltaTime);
+        raytrace(cameraPos);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glUseProgram(drawCallProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
@@ -123,7 +125,15 @@ int main() {
     return 0;
 }
 
-void processInput(GLFWwindow *window) {
+void processInput(GLFWwindow *window, double &deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos.z += CAMERA_MOVE_SPEED * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos.z -= CAMERA_MOVE_SPEED * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos.x -= CAMERA_MOVE_SPEED * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos.x += CAMERA_MOVE_SPEED * deltaTime;
 }

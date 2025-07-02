@@ -8,6 +8,7 @@ uniform float u_FOV;
 uniform float u_ViewportDist;
 uniform uint u_RayBounces;
 uniform uint u_RaysPerPixel;
+uniform vec3 cameraPos;
 
 layout(std430, binding = 0) buffer VertexBuffer {
     vec4 vertices[];
@@ -70,7 +71,7 @@ void main() {
     );
     vec4 colour = BLACK;
     for (uint i = uint(0); i < u_RaysPerPixel; i++) {
-        colour += castRay(dir, dir, u_RayBounces);
+        colour += castRay(cameraPos + dir, dir, u_RayBounces);
     }
     colour /= u_RaysPerPixel;
     imageStore(pixelOutput, ivec2(gl_GlobalInvocationID.xy), colour);

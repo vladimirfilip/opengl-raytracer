@@ -1,3 +1,5 @@
+#include "raytrace.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -15,17 +17,14 @@
 static GLuint raytraceProgram;
 static GLuint groups_x, groups_y;
 
-template <typename T>
-void initSSBO(std::vector<T>& data, unsigned int binding) {
+template<typename T>
+void initSSBO(std::vector<T> &data, unsigned int binding) {
     GLuint ssbo;
     glGenBuffers(1, &ssbo);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glGenBuffers");
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBuffer");
-    glBufferData(GL_SHADER_STORAGE_BUFFER,
-                 data.size() * sizeof(T),
-                 data.data(),
-                 GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(T), data.data(), GL_DYNAMIC_DRAW);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBufferData");
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBufferBase");
@@ -58,25 +57,25 @@ void raytraceInit() {
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
     const int screenWidth = mode->width;
     const int screenHeight = mode->height;
-    raytraceProgram = generateProgram(importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER));
+    raytraceProgram = generateProgram(
+            importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER));
     glUseProgram(raytraceProgram);
-    glUniform1f(
-            glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
-            static_cast<GLfloat>(screenWidth));
-    glUniform1f(
-            glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
-            static_cast<GLfloat>(screenHeight));
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
+                static_cast<GLfloat>(screenWidth));
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
+                static_cast<GLfloat>(screenHeight));
     glUniform1f(glGetUniformLocation(raytraceProgram, "u_FOV"),
                 static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"),
-                VIEWPORT_DIST);
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"), VIEWPORT_DIST);
     glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
     glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
     groups_x = (screenWidth + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
     groups_y = (screenHeight + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 };
 
-void raytrace() {
+void raytrace(glm::vec3 cameraPos) {
     glUseProgram(raytraceProgram);
+    glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
+                cameraPos.z);
     glDispatchCompute(groups_x, groups_y, 1);
 }
