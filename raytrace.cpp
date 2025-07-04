@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <numbers>
 #include <iostream>
@@ -74,12 +75,10 @@ void raytraceInit() {
     groups_y = (screenHeight + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 };
 
-void raytrace(glm::vec3 cameraPos, double mouseX, double mouseY) {
+void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation) {
     glUseProgram(raytraceProgram);
-    double mouseRotationY = -(((int) mouseX - screenWidth / 2) % (screenWidth * 2)) * (std::numbers::pi / screenWidth);
-    double mouseRotationX = -(((int) mouseY - screenHeight / 2) % (screenHeight * 2)) * (std::numbers::pi / screenHeight);
     glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
                 cameraPos.z);
-    glUniform2f(glGetUniformLocation(raytraceProgram, "cameraRotation"), mouseRotationX, mouseRotationY);
+    glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE, glm::value_ptr(cameraRotation));
     glDispatchCompute(groups_x, groups_y, 1);
 }

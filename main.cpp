@@ -15,25 +15,32 @@
 
 static glm::vec3 cameraPos(0.0f, 0.0f, 0.0f);
 static glm::mat3 cameraRotation;
+static double cameraPitch = 0.0f, cameraYaw = 0.0f;
+static double prevMouseX, prevMouseY;
+static int screenWidth, screenHeight;
+static GLFWwindow* window;
 
-void processInput(GLFWwindow *window, double &deltaTime);
+void processInput(double &prevTime);
 
-static void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos) {
-    std::cout << "Position: (" << xpos << ", " << ypos << ")\n";
-}
-
-static void updateCameraRotation(float mouseX, float mouseY, int screenWidth, int screenHeight) {
-    double mouseRotationY = -(((int) mouseX - screenWidth / 2) % (screenWidth * 2)) * (std::numbers::pi / screenWidth);
-    double mouseRotationX = -(((int) mouseY - screenHeight / 2) % (screenHeight * 2)) * (std::numbers::pi / screenHeight);
+static void updateCameraRotation() {
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+    double dx = mouseX - prevMouseX;
+    double dy = mouseY - prevMouseY;
+    cameraPitch -= dy * std::numbers::pi / screenHeight;
+    cameraYaw -= dx * std::numbers::pi / screenWidth;
+    cameraPitch = std::max(-std::numbers::pi / 2.0f, std::min(std::numbers::pi / 2.0f, cameraPitch));
+    prevMouseX = mouseX;
+    prevMouseY = mouseY;
     glm::mat3 xRotation = glm::mat3(
             1.0f, 0.0f, 0.0f,
-            0.0f, cos(mouseRotationX), -sin(mouseRotationX),
-            0.0f, sin(mouseRotationX), cos(mouseRotationX)
+            0.0f, cos(cameraPitch), -sin(cameraPitch),
+            0.0f, sin(cameraPitch), cos(cameraPitch)
     );
     glm::mat3 yRotation = glm::mat3(
-            cos(mouseRotationY), 0.0f, sin(mouseRotationY),
+            cos(cameraYaw), 0.0f, sin(cameraYaw),
             0.0f, 1.0f, 0.0f,
-            -sin(mouseRotationY), 0.0f, cos(mouseRotationY)
+            -sin(cameraYaw), 0.0f, cos(cameraYaw)
     );
     cameraRotation = yRotation * xRotation;
 }
@@ -52,7 +59,7 @@ int main() {
     // --------------------
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    GLFWwindow *window = glfwCreateWindow(mode->width, mode->height, "opengl raytracer", monitor,
+    window = glfwCreateWindow(mode->width, mode->height, "opengl raytracer", monitor,
                                           nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -60,6 +67,8 @@ int main() {
         return -1;
     }
     glfwMakeContextCurrent(window);
+    screenWidth = mode->width;
+    screenHeight = mode->height;
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -69,7 +78,6 @@ int main() {
     }
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, cursorPositionCallback);
 
     GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
     GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
@@ -125,16 +133,13 @@ int main() {
     int frameCount = 0;
     double startTime = glfwGetTime();
     double prevTime = startTime;
-    double deltaTime;
     while (!glfwWindowShouldClose(window)) {
-        double currTime = glfwGetTime();
-        deltaTime = currTime - prevTime;
-        prevTime = currTime;
-        double mouseX, mouseY;
-        glfwGetCursorPos(window, &mouseX, &mouseY);
-        updateCameraRotation(mouseX, mouseY, mode->width, mode->height);
-        processInput(window, deltaTime);
-        raytrace(cameraPos, mouseX, mouseY);
+        if (frameCount == 0) {
+            glfwGetCursorPos(window, &prevMouseX, &prevMouseY);
+        }
+        processInput(prevTime);
+        updateCameraRotation();
+        raytrace(cameraPos, cameraRotation);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glUseProgram(drawCallProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
@@ -152,7 +157,9 @@ int main() {
     return 0;
 }
 
-void processInput(GLFWwindow *window, double &deltaTime) {
+void processInput(double& prevTime) {
+    double deltaTime = glfwGetTime() - prevTime;
+    prevTime += deltaTime;
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
