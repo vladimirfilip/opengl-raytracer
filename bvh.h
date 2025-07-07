@@ -19,4 +19,6 @@ extern BVHNode* generateBVH(std::vector<glm::uvec3>& triangles, std::vector<glm:
 
 extern std::vector<glm::mat3> serialiseBVH(BVHNode* node);
 
+extern void freeBVH(BVHNode* node);
+
 #endif //OPENGL_RAYTRACER_BVH_H

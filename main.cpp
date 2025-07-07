@@ -68,20 +68,6 @@ int main() {
         glfwTerminate();
         return -1;
     }
-    ObjContents *contents = readObjContents("../model.obj");
-    std::vector<glm::vec3> triangleVertices = contents->vertices;
-    std::vector<glm::uvec3> triangles = contents->triangles;
-    auto bvh = generateBVH(triangles, triangleVertices);
-    auto v = serialiseBVH(bvh);
-    for (auto e : v) {
-        std::cout << "[ \n";
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++)
-                std::cout << e[j][i] << " ";
-            std::cout << std::endl;
-        }
-        std::cout << "]" << std::endl;
-    }
     glfwMakeContextCurrent(window);
     screenWidth = mode->width;
     screenHeight = mode->height;

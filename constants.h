@@ -5,6 +5,9 @@
 #define TRIANGLE_SSBO_BINDING 1
 #define TRIANGLE_NORMAL_SSBO_BINDING 2
 #define PIXEL_OUTPUT_BINDING 3
+#define BVH_BINDING 4
+
+#define SCENE_FILE_PATH "../teapot.obj"
 
 const float FOV = 90.0f;
 const float VIEWPORT_DIST = 1.0f;

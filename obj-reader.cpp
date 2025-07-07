@@ -20,11 +20,11 @@ ObjContents *readObjContents(const std::string& filePath) {
         switch (type) {
             case VERTEX_TYPE:
                 fin >> x >> y >> z;
-                res->vertices.push_back(glm::vec3(x, y, z));
+                res->vertices.emplace_back(x, y, z);
                 break;
             case FACE_TYPE:
                 fin >> i1 >> i2 >> i3;
-                res->triangles.push_back(glm::uvec3(i1, i2, i3));
+                res->triangles.emplace_back(--i1, --i2, --i3);
                 break;
             default:
                 throw std::runtime_error("Unknown type: " + std::string(1, type));

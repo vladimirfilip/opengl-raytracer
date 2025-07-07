@@ -42,21 +42,23 @@ void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num
     glDeleteProgram(program);
 }
 
+struct AlignedMat3 {
+    glm::vec4 u, v, w;
+};
+
 void initBuffers() {
-    ObjContents *contents = readObjContents("../model.obj");
+    ObjContents *contents = readObjContents(SCENE_FILE_PATH);
     std::vector<glm::vec3> triangleVertices = contents->vertices;
     std::vector<glm::uvec3> triangles = contents->triangles;
-    auto bvh = generateBVH(triangles, triangleVertices);
-    auto v = serialiseBVH(bvh);
-    for (auto e : v) {
-        std::cout << "[ \n";
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++)
-                std::cout << e[j][i] << " ";
-            std::cout << std::endl;
-        }
-        std::cout << "]" << std::endl;
+    std::vector<glm::mat3> bvhNodes = serialiseBVH(generateBVH(triangles, triangleVertices));
+    std::vector<AlignedMat3> alignedBVHNodes(bvhNodes.size());
+    for (int i = 0; i < bvhNodes.size(); i++) {
+        alignedBVHNodes[i] = AlignedMat3{
+            glm::vec4(bvhNodes[i][0], 0.0f),
+            glm::vec4(bvhNodes[i][1], 0.0f),
+        glm::vec4(bvhNodes[i][2], 0.0f) };
     }
+    initSSBO(alignedBVHNodes, BVH_BINDING);
     std::vector<glm::vec4> triangleVertices4(triangleVertices.size());
     for (int i = 0; i < triangleVertices.size(); i++) triangleVertices4[i] = glm::vec4(triangleVertices[i], 0.0f);
     std::vector<glm::uvec4> triangles4(triangles.size());
