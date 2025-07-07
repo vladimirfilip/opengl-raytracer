@@ -3,13 +3,13 @@
 
 #include <vector>
 #include <string>
-#include "glm/vec4.hpp"
+#include "glm/glm.hpp"
 
 struct ObjContents {
-    std::vector<glm::vec4> vertices;
-    std::vector<glm::uvec4> triangles;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::uvec3> triangles;
 };
 
-ObjContents* readObjContents(const std::string& filePath);
+extern ObjContents* readObjContents(const std::string& filePath);
 
 #endif //OPENGL_RAYTRACER_OBJ_READER_H

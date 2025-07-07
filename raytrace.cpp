@@ -12,6 +12,7 @@
 #include "constants.h"
 #include "util.h"
 #include "obj-reader.h"
+#include "bvh.h"
 
 #define WORKGROUP_SIZE 32
 
@@ -41,20 +42,36 @@ void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num
     glDeleteProgram(program);
 }
 
-
-void raytraceInit() {
-    // Building internal triangle and vertex buffers
+void initBuffers() {
     ObjContents *contents = readObjContents("../model.obj");
-    std::vector<glm::vec4> triangleVertices = contents->vertices;
-    initSSBO(triangleVertices, VERTEX_SSBO_BINDING);
-    std::vector<glm::uvec4> triangles = contents->triangles;
-    initSSBO(triangles, TRIANGLE_SSBO_BINDING);
+    std::vector<glm::vec3> triangleVertices = contents->vertices;
+    std::vector<glm::uvec3> triangles = contents->triangles;
+    auto bvh = generateBVH(triangles, triangleVertices);
+    auto v = serialiseBVH(bvh);
+    for (auto e : v) {
+        std::cout << "[ \n";
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++)
+                std::cout << e[j][i] << " ";
+            std::cout << std::endl;
+        }
+        std::cout << "]" << std::endl;
+    }
+    std::vector<glm::vec4> triangleVertices4(triangleVertices.size());
+    for (int i = 0; i < triangleVertices.size(); i++) triangleVertices4[i] = glm::vec4(triangleVertices[i], 0.0f);
+    std::vector<glm::uvec4> triangles4(triangles.size());
+    for (int i = 0; i < triangles.size(); i++) triangles4[i] = glm::uvec4(triangles[i], 0);
+    initSSBO(triangleVertices4, VERTEX_SSBO_BINDING);
+    initSSBO(triangles4, TRIANGLE_SSBO_BINDING);
     free(contents);
     std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
     GLuint normalShader = importAndCompileShader("../shaders/normals.glsl", GL_COMPUTE_SHADER);
     runComputeShader(normalShader, (int) triangles.size(), 1, 1);
-    // Static constants cast to float
+}
+
+void raytraceInit() {
+    initBuffers();
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
     screenWidth = mode->width;
@@ -79,6 +96,7 @@ void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation) {
     glUseProgram(raytraceProgram);
     glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
                 cameraPos.z);
-    glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE, glm::value_ptr(cameraRotation));
+    glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE,
+                       glm::value_ptr(cameraRotation));
     glDispatchCompute(groups_x, groups_y, 1);
 }

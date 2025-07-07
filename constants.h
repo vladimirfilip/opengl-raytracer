@@ -11,5 +11,6 @@ const float VIEWPORT_DIST = 1.0f;
 const unsigned int RAY_BOUNCES = 5;
 const unsigned int RAYS_PER_PIXEL = 5;
 const float CAMERA_MOVE_SPEED = 3.0f;
+const int MAXIMUM_BVH_LEAF_TRIANGLE_COUNT = 4;
 
 #endif //OPENGL_RAYTRACER_CONSTANTS_H

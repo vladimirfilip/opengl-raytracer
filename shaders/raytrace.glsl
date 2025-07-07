@@ -53,7 +53,8 @@ bool intersectsTriangle(vec3 origin, vec3 dir, int triangleIndex) {
 vec4 castRay(vec3 origin, vec3 dir, uint bouncesLeft) {
     for (int i = 0; i < triangles.length(); i++) {
         if (intersectsTriangle(origin, dir, i)) {
-            return WHITE;
+            float shade = abs(dot(triangleNormals[i].xyz, dir) / (length(dir) * length(triangleNormals[i].xyz)));
+            return vec4(shade, shade, shade, 1.0f);
         }
     }
     return BLACK;
