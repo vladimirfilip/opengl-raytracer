@@ -17,15 +17,15 @@ uniform vec3 cameraPos;
 uniform mat3 cameraRotation;
 
 layout(std430, binding = 0) buffer VertexBuffer {
-    vec4 vertices[];
+    vec3 vertices[];
 };
 
 layout(std430, binding = 1) buffer TriangleBuffer {
-    uvec4 triangles[];
+    uvec3 triangles[];
 };
 
 layout(std430, binding = 2) buffer NormalsBuffer {
-    vec4 triangleNormals[];
+    vec3 triangleNormals[];
 };
 
 layout(binding = 3, rgba32f) uniform image2D pixelOutput;
@@ -46,10 +46,10 @@ const float EPS = 1e-3;
  * distance = INFINITY if ray does not intersect
  */
 float getRayTriangleDistance(vec3 origin, vec3 dir, int triangleIndex) {
-    vec3 a = vertices[triangles[triangleIndex].x].xyz;
-    vec3 b = vertices[triangles[triangleIndex].y].xyz;
-    vec3 c = vertices[triangles[triangleIndex].z].xyz;
-    vec3 n = triangleNormals[triangleIndex].xyz;
+    vec3 a = vertices[triangles[triangleIndex].x];
+    vec3 b = vertices[triangles[triangleIndex].y];
+    vec3 c = vertices[triangles[triangleIndex].z];
+    vec3 n = triangleNormals[triangleIndex];
     float denom = dot(dir, n);
     if (abs(denom) < EPS)
         return INFINITY;
@@ -94,35 +94,40 @@ float getRayYZPlaneDistance(vec3 origin, vec3 dir, vec4 points, float x) {
     return alpha;
 }
 
-float getRayBoundingBoxDistance(vec3 origin, vec3 dir, int bvhIndex) {
-    vec3 minVertex = bvh[bvhIndex][0];
-    vec3 maxVertex = bvh[bvhIndex][1];
-    float dist = INFINITY;
-    vec4 xy = vec4(minVertex.x, minVertex.y, maxVertex.x, maxVertex.y);
-    vec4 xz = vec4(minVertex.x, minVertex.z, maxVertex.x, maxVertex.z);
-    vec4 yz = vec4(minVertex.y, minVertex.z, maxVertex.y, maxVertex.z);
-    dist = min(dist, getRayXYPlaneDistance(origin, dir, xy, minVertex.z));
-    dist = min(dist, getRayXYPlaneDistance(origin, dir, xy, maxVertex.z));
-    dist = min(dist, getRayXZPlaneDistance(origin, dir, xz, minVertex.y));
-    dist = min(dist, getRayXZPlaneDistance(origin, dir, xz, maxVertex.y));
-    dist = min(dist, getRayYZPlaneDistance(origin, dir, yz, minVertex.x));
-    dist = min(dist, getRayYZPlaneDistance(origin, dir, yz, maxVertex.y));
-    dist = 1.0f;
-    return dist;
+// Thanks to https://gist.github.com/DomNomNom/46bb1ce47f68d255fd5d
+bool rayIntersectsBoundingBox(vec3 origin, vec3 dir, vec3 boxMin, vec3 boxMax) {
+    vec3 invDir = 1 / dir;
+    vec3 tMin = (boxMin - origin) * invDir;
+    vec3 tMax = (boxMax - origin) * invDir;
+    vec3 t1 = min(tMin, tMax);
+    vec3 t2 = max(tMin, tMax);
+    float tNear = max(max(t1.x, t1.y), t1.z);
+    float tFar = min(min(t2.x, t2.y), t2.z);
+    return tNear <= tFar;
 }
 
 HitInfo getHitInfo(vec3 origin, vec3 dir) {
     HitInfo info;
     info.dist = INFINITY;
     info.triangleIndex = -1;
+/* Old code, loop over all triangles
+    for (int i = 0; i < triangles.length(); i++) {
+        float triangleDist = getRayTriangleDistance(origin, dir, i);
+        if (triangleDist < info.dist) {
+            info.dist = triangleDist;
+            info.triangleIndex = i;
+        }
+    }
+*/
     int stack[MAX_BVH_TRAVERSAL_STACK_SIZE];
     int i = 0;
     stack[0] = 0;
     while (i > -1) {
         int bvhIndex = stack[i];
-        float d = getRayBoundingBoxDistance(origin, dir, bvhIndex);
-        if (d > info.dist)
+        if (!rayIntersectsBoundingBox(origin, dir, bvh[bvhIndex][0], bvh[bvhIndex][1])) {
+            i--;
             continue;
+        }
         bool isLeaf = abs(bvh[bvhIndex][2].x - 1.0f) <= EPS;
         if (isLeaf) {
             int triangleStart = int(bvh[bvhIndex][2].y);
@@ -137,18 +142,14 @@ HitInfo getHitInfo(vec3 origin, vec3 dir) {
         } else {
             int child1 = int(bvh[bvhIndex][2].y);
             int child2 = int(bvh[bvhIndex][2].z);
-            float d1 = getRayBoundingBoxDistance(origin, dir, child1);
-            float d2 = getRayBoundingBoxDistance(origin, dir, child2);
+            float d1 = length((bvh[child1][0] + bvh[child1][1]) / 2.0 - origin);
+            float d2 = length((bvh[child2][0] + bvh[child2][1]) / 2.0 - origin);
             if (d1 < d2) {
-                if (d1 < info.dist)
-                    stack[i++] = child1;
-                if (d2 < info.dist)
-                    stack[i++] = child2;
+                stack[i++] = child1;
+                stack[i++] = child2;
             } else {
-                if (d2 < info.dist)
-                    stack[i++] = child2;
-                if (d1 < info.dist)
-                    stack[i++] = child1;
+                stack[i++] = child2;
+                stack[i++] = child1;
             }
         }
         i--;

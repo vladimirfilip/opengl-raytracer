@@ -7,7 +7,7 @@
 #define PIXEL_OUTPUT_BINDING 3
 #define BVH_BINDING 4
 
-#define SCENE_FILE_PATH "../teapot.obj"
+#define SCENE_FILE_PATH "../model.obj"
 
 const float FOV = 90.0f;
 const float VIEWPORT_DIST = 1.0f;

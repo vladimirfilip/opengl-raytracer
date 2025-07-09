@@ -150,7 +150,7 @@ BVHNode* generateBVH(std::vector<glm::uvec3>& triangles, std::vector<glm::vec3>&
         triangleData[i][0] = (v1 + v2 + v3) / 3.0f;
         triangleData[i][1] = min(v1, min(v2, v3));
         triangleData[i][2] = max(v1, max(v2, v3));
-        triangleData[i][3] = triangles[i];
+        triangleData[i][3] = (glm::vec3) triangles[i] + glm::vec3(0.2f, 0.2f, 0.2f);
     }
     BVHNode* res = generateBVH(triangleData);
     for (int i = 0; i < triangleData.size(); i++) {
