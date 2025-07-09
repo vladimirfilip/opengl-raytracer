@@ -98,7 +98,6 @@ static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData) {
     std::unordered_map<int, BVHNode*> startToNode, endToNode;
     BVHNode *res = nullptr;
     while (!intervals.empty()) {
-        std::cout << intervals.size() << std::endl;
         auto [start, end] = intervals.top();
         intervals.pop();
         auto* node = new BVHNode();
