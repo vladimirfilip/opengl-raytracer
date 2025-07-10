@@ -6,10 +6,13 @@
 #include <vector>
 #include <cmath>
 
+#define MIN_VERTEX glm::vec3{-1e9, -1e9, -1e9}
+#define MAX_VERTEX glm::vec3{1e9, 1e9, 1e9}
+
 struct BVHNode {
     int id;
-    glm::vec3 minCorner = {INFINITY, INFINITY, INFINITY};
-    glm::vec3 maxCorner = {-INFINITY, -INFINITY, -INFINITY};
+    glm::vec3 minCorner = MAX_VERTEX;
+    glm::vec3 maxCorner = MIN_VERTEX;
     BVHNode* children[2];
     int triangleStart, triangleEnd;
     bool isLeaf = false;

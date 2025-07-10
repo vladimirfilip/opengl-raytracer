@@ -10,16 +10,14 @@
 
 static int n = 0;
 
-enum Axis {X, Y, Z};
-
 struct SplitInfo {
-    int splitIndex;
-    Axis axis;
-    float minCost;
+    int axis;
+    float splitVal;
+    float cost;
 };
 
 SplitInfo min(SplitInfo a, SplitInfo b) {
-    if (a.minCost < b.minCost)
+    if (a.cost < b.cost)
         return a;
     return b;
 }
@@ -30,112 +28,71 @@ static void addTriangle(BVHNode* node, glm::mat4x3& triangleData) {
     node->maxCorner = max(node->maxCorner, triangleData[2]);
 }
 
-static float getSA(glm::vec3 dimensions) {
+static float getSA(glm::vec3 min, glm::vec3 max) {
+    glm::vec3 dimensions = max - min;
     return 6 * (dimensions.x * dimensions.y +
         dimensions.x * dimensions.z +
         dimensions.y * dimensions.z);
 }
 
-static auto sortByX = [](const glm::mat4x3& a, const glm::mat4x3& b) {
-    return a[0].x < b[0].x;
-};
+float getSplitCost(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end, int axis, float splitVal) {
 
-static auto sortByY = [](const glm::mat4x3& a, const glm::mat4x3& b) {
-    return a[0].y < b[0].y;
-};
-
-static auto sortByZ = [](const glm::mat4x3& a, const glm::mat4x3& b) {
-    return a[0].z < b[0].z;
-};
-
-SplitInfo splitOnAxis(std::vector<glm::mat4x3>& triangleData,
-                 int start, int end, Axis axis) {
-    SplitInfo res{-1, axis, INFINITY};
-    std::vector<glm::vec3> minVertexPrefix(end - start + 1),
-            maxVertexPrefix(end - start + 1),
-            minVertexSuffix(end - start + 1),
-            maxVertexSuffix(end - start + 1);
-    minVertexPrefix[0] = triangleData[start][1];
-    maxVertexPrefix[0] = triangleData[start][2];
-    for (int i = 1; i < minVertexPrefix.size(); i++) {
-        minVertexPrefix[i] = min(minVertexPrefix[i - 1], triangleData[start + i][1]);
-        maxVertexPrefix[i] = max(maxVertexPrefix[i - 1], triangleData[start + i][2]);
-    }
-    minVertexSuffix[end - start] = triangleData[end][1];
-    maxVertexSuffix[end - start] = triangleData[end][2];
-    for (int i = end - start - 1; i >= 0; i--) {
-        minVertexSuffix[i] = min(minVertexSuffix[i + 1], triangleData[start + i][1]);
-        maxVertexSuffix[i] = max(maxVertexSuffix[i + 1], triangleData[start + i][2]);
-    }
-    for (int i = 0; i < minVertexPrefix.size() - 1; i++) {
-        glm::vec3 leftDimensions = maxVertexPrefix[i] - minVertexPrefix[i];
-        glm::vec3 rightDimensions = maxVertexSuffix[i + 1] - minVertexSuffix[i + 1];
-        float leftSA = getSA(leftDimensions);
-        float rightSA = getSA(rightDimensions);
-        float cost = leftSA + rightSA;
-        if (cost < res.minCost) {
-            res.splitIndex = i;
-            res.minCost = cost;
-        }
-    }
-    assert(res.splitIndex != -1);
-    return res;
 }
 
-SplitInfo getSplit(std::vector<glm::mat4x3>& triangleData, int start, int end) {
-    std::sort(triangleData.begin() + start, triangleData.begin() + end + 1, sortByX);
-    SplitInfo info = splitOnAxis(triangleData, start, end, X);
-    std::sort(triangleData.begin() + start, triangleData.begin() + end + 1, sortByY);
-    info = min(info, splitOnAxis(triangleData, start, end, Y));
-    std::sort(triangleData.begin() + start, triangleData.begin() + end + 1, sortByZ);
-    info = min(info, splitOnAxis(triangleData, start, end, Z));
+SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
+    SplitInfo info{0, 0.0f, INFINITY};
+    for (int axis = 0; axis < 3; axis++) {
+        float minVal = node->minCorner[axis];
+        float maxVal = node->maxCorner[axis];
+        float splitDelta = (maxVal - minVal) / (float) (BVH_SPLIT_TESTS_PER_AXIS + 1);
+        for (int i = 0; i < BVH_SPLIT_TESTS_PER_AXIS; i++) {
+            float splitVal = minVal + splitDelta * (float) (i + 1);
+            glm::vec3 leftMin = MAX_VERTEX, rightMin = MAX_VERTEX, leftMax = MIN_VERTEX, rightMax = MIN_VERTEX;
+            float numLeft = 0, numRight = 0;
+            for (int j = start; j <= end; j++) {
+                if (triangleData[j][0][axis] < splitVal) {
+                    leftMin = min(leftMin, triangleData[j][1]);
+                    leftMax = max(leftMax, triangleData[j][2]);
+                    numLeft++;
+                } else {
+                    rightMin = min(rightMin, triangleData[j][1]);
+                    rightMax = max(rightMax, triangleData[j][2]);
+                    numRight++;
+                }
+            }
+            leftMax = max(leftMax, leftMin);
+            rightMax = max(rightMax, rightMin);
+            float cost = numLeft * getSA(leftMin, leftMax) + numRight * getSA(rightMin, rightMax);
+            info = min(info, SplitInfo{axis, (float)splitVal, cost});
+        }
+    }
+    assert(info.cost < INFINITY);
     return info;
 }
 
-static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData) {
-    std::stack<std::pair<int, int>> intervals;
-    intervals.emplace(0, triangleData.size() - 1);
-    std::unordered_map<int, BVHNode*> startToNode, endToNode;
-    BVHNode *res = nullptr;
-    while (!intervals.empty()) {
-        auto [start, end] = intervals.top();
-        intervals.pop();
-        auto* node = new BVHNode();
-        if (res == nullptr)
-            res = node;
-        node->id = n++;
-        if (end - start + 1 <= MAXIMUM_BVH_LEAF_TRIANGLE_COUNT) {
-            node->isLeaf = true;
-            node->triangleStart = start;
-            node->triangleEnd = end;
-        }
+static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, int end, int depth = 0) {
+    auto* res = new BVHNode();
+    res->id = n++;
+    res->isLeaf = (end - start + 1) <= MAX_BVH_LEAF_TRIANGLE_COUNT || depth == MAX_BVH_DEPTH;
+    for (int i = start; i <= end; i++) {
+        addTriangle(res, triangleData[i]);
+    }
+    if (!res->isLeaf) {
+        SplitInfo info = getSplit(res, triangleData, start, end);
+        std::cout << "SPLITTING ON " << info.axis << " AT VALUE " << info.splitVal << std::endl;
+        int numOnLeft = 0;
         for (int i = start; i <= end; i++) {
-            addTriangle(node, triangleData[i]);
-        }
-        if (startToNode.count(start))
-            startToNode[start]->children[0] = node;
-        if (endToNode.count(end))
-            endToNode[end]->children[1] = node;
-        if (!node->isLeaf) {
-            startToNode[start] = node;
-            endToNode[end] = node;
-            SplitInfo info = getSplit(triangleData, start, end);
-            std::function<bool(glm::mat4, glm::mat4)> comp;
-            switch (info.axis) {
-                case X:
-                    comp = sortByX;
-                    break;
-                case Y:
-                    comp = sortByY;
-                    break;
-                case Z:
-                    comp = sortByZ;
-                    break;
+            if (triangleData[i][0][info.axis] < info.splitVal) {
+                std::swap(triangleData[start + numOnLeft], triangleData[i]);
+                numOnLeft++;
             }
-            std::sort(triangleData.begin() + start, triangleData.begin() + end + 1, comp);
-            intervals.emplace(info.splitIndex + 1, end);
-            intervals.emplace(start, info.splitIndex);
         }
+        assert(0 < numOnLeft && numOnLeft <= end - start);
+        res->children[0] = generateBVH(triangleData, start, start + numOnLeft - 1, depth + 1);
+        res->children[1] = generateBVH(triangleData, start + numOnLeft, end, depth + 1);
+    } else {
+        res->triangleStart = start;
+        res->triangleEnd = end;
     }
     return res;
 }
@@ -151,7 +108,7 @@ BVHNode* generateBVH(std::vector<glm::uvec3>& triangles, std::vector<glm::vec3>&
         triangleData[i][2] = max(v1, max(v2, v3));
         triangleData[i][3] = (glm::vec3) triangles[i] + glm::vec3(0.2f, 0.2f, 0.2f);
     }
-    BVHNode* res = generateBVH(triangleData);
+    BVHNode* res = generateBVH(triangleData, 0, triangleData.size() - 1);
     for (int i = 0; i < triangleData.size(); i++) {
         triangles[i] = triangleData[i][3];
     }

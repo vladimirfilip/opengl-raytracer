@@ -135,6 +135,7 @@ int main() {
     int frameCount = 0;
     double startTime = glfwGetTime();
     double prevTime = startTime;
+    std::cout << "BEGAN RENDER LOOP" << std::endl;
     while (!glfwWindowShouldClose(window)) {
         if (frameCount == 0) {
             glfwGetCursorPos(window, &prevMouseX, &prevMouseY);

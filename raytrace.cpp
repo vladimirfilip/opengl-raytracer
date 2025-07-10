@@ -50,7 +50,18 @@ void initBuffers() {
     ObjContents *contents = readObjContents(SCENE_FILE_PATH);
     std::vector<glm::vec3> triangleVertices = contents->vertices;
     std::vector<glm::uvec3> triangles = contents->triangles;
-    std::vector<glm::mat3> bvhNodes = serialiseBVH(generateBVH(triangles, triangleVertices));
+    auto bvh = generateBVH(triangles, triangleVertices);
+    auto v = serialiseBVH(bvh);
+    for (auto e : v) {
+        std::cout << "[ \n";
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++)
+                std::cout << e[j][i] << " ";
+            std::cout << std::endl;
+        }
+        std::cout << "]" << std::endl;
+    }
+    std::vector<glm::mat3> bvhNodes = v;
     std::vector<AlignedMat3> alignedBVHNodes(bvhNodes.size());
     for (int i = 0; i < bvhNodes.size(); i++) {
         alignedBVHNodes[i] = AlignedMat3{
