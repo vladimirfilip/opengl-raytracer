@@ -82,7 +82,7 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
-    GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
+    GLuint fragmentShader = importAndCompileShader("../shaders/raytrace.frag", GL_FRAGMENT_SHADER);
 
     // set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
