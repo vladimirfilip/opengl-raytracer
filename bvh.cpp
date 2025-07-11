@@ -35,10 +35,6 @@ static float getSA(glm::vec3 min, glm::vec3 max) {
         dimensions.y * dimensions.z);
 }
 
-float getSplitCost(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end, int axis, float splitVal) {
-
-}
-
 SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
     SplitInfo info{0, 0.0f, INFINITY};
     for (int axis = 0; axis < 3; axis++) {
@@ -62,8 +58,8 @@ SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int st
             }
             leftMax = max(leftMax, leftMin);
             rightMax = max(rightMax, rightMin);
-            float cost = numLeft * getSA(leftMin, leftMax) + numRight * getSA(rightMin, rightMax);
-            info = min(info, SplitInfo{axis, (float)splitVal, cost});
+            float cost = 1.0f + 2.0f * numLeft * getSA(leftMin, leftMax) / getSA(node->minCorner, node->maxCorner) + 2.0f * numRight * getSA(rightMin, rightMax) / getSA(node->minCorner, node->maxCorner);
+            info = min(info, SplitInfo{axis, splitVal, cost});
         }
     }
     assert(info.cost < INFINITY);

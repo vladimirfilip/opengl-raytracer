@@ -14,10 +14,6 @@
 #include "obj-reader.h"
 #include "bvh.h"
 
-#define WORKGROUP_SIZE 32
-
-static GLuint raytraceProgram;
-static GLuint groups_x, groups_y;
 static int screenWidth, screenHeight;
 
 template<typename T>
@@ -83,33 +79,7 @@ void initBuffers() {
     runComputeShader(normalShader, (int) triangles.size(), 1, 1);
 }
 
-void raytraceInit() {
+void raytraceInit(GLuint program) {
     initBuffers();
-    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    screenWidth = mode->width;
-    screenHeight = mode->height;
-    raytraceProgram = generateProgram(
-            importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER));
-    glUseProgram(raytraceProgram);
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
-                static_cast<GLfloat>(screenWidth));
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
-                static_cast<GLfloat>(screenHeight));
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_FOV"),
-                static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"), VIEWPORT_DIST);
-    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
-    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
-    groups_x = (screenWidth + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-    groups_y = (screenHeight + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+    checkGLError("(raytraceInit) initBuffers()");
 };
-
-void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation) {
-    glUseProgram(raytraceProgram);
-    glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
-                cameraPos.z);
-    glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE,
-                       glm::value_ptr(cameraRotation));
-    glDispatchCompute(groups_x, groups_y, 1);
-}

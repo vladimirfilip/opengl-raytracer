@@ -9,6 +9,7 @@
 #include "constants.h"
 #include "obj-reader.h"
 #include "bvh.h"
+#include "glm/gtc/type_ptr.hpp"
 
 /*
  * Disclaimer: boilerplate to render two triangles on the screen
@@ -112,49 +113,68 @@ int main() {
     glEnableVertexAttribArray(0);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+    checkGLError("(main) prior to program init");
     // link shaders
-    GLuint drawCallProgram = generateProgram(vertexShader, fragmentShader);
-    glUseProgram(drawCallProgram);
-    GLuint outputTex;
-    glGenTextures(1, &outputTex);
-    glBindTexture(GL_TEXTURE_2D, outputTex);
-    checkGLError("(main) glGenTextures");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mode->width, mode->height, 0, GL_RGBA, GL_FLOAT,
-                 nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glBindImageTexture(PIXEL_OUTPUT_BINDING, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,
-                       GL_RGBA32F); // unit 0
-    glActiveTexture(GL_TEXTURE0);
-    glUniform1i(glGetUniformLocation(drawCallProgram, "outputTexture"), 0);
+    GLuint program = generateProgram(vertexShader, fragmentShader);
+    GLint count;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
+    std::cout << "Active uniforms: " << count << std::endl;
+    GLint success = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (success == GL_FALSE) {
+        // Linking failed, you can get the info log for details:
+        GLint logLength = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
 
-    raytraceInit();
+        std::vector<GLchar> infoLog(logLength);
+        glGetProgramInfoLog(program, logLength, NULL, infoLog.data());
+
+        // Print or log the error
+        std::cerr << "Shader program linking failed:\n" << infoLog.data() << std::endl;
+    }
+    checkGLError("(main) generateProgram()");
+    glUseProgram(program);
+    glUniform1f(glGetUniformLocation(program, "u_ScreenWidth"),
+                static_cast<GLfloat>(screenWidth));
+    std::cout << glGetUniformLocation(program, "u_ScreenWidth") << std::endl;
+    checkGLError("(raytraceInit) set screenWidth");
+    glUniform1f(glGetUniformLocation(program, "u_ScreenHeight"),
+                static_cast<GLfloat>(screenHeight));
+    checkGLError("(raytraceInit) set screenHeight");
+    glUniform1f(glGetUniformLocation(program, "u_FOV"),
+                static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
+    checkGLError("(raytraceInit) set FOV");
+    glUniform1f(glGetUniformLocation(program, "u_ViewportDist"), VIEWPORT_DIST);
+    checkGLError("(raytraceInit) set viewportDist");
+    glUniform1ui(glGetUniformLocation(program, "u_RaysPerPixel"), RAYS_PER_PIXEL);
+    glUniform1ui(glGetUniformLocation(program, "u_RayBounces"), RAY_BOUNCES);
+    checkGLError("(raytraceInit) set uniforms");
+    raytraceInit(program);
+    checkGLError("(main) after raytraceInit()");
     // render loop
     // -----------
     int frameCount = 0;
     double startTime = glfwGetTime();
     double prevTime = startTime;
     std::cout << "BEGAN RENDER LOOP" << std::endl;
+    glUseProgram(program);
+    glfwGetCursorPos(window, &prevMouseX, &prevMouseY);
     while (!glfwWindowShouldClose(window)) {
-        if (frameCount == 0) {
-            glfwGetCursorPos(window, &prevMouseX, &prevMouseY);
-        }
         processInput(prevTime);
         updateCameraRotation();
-        raytrace(cameraPos, cameraRotation);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        glUseProgram(drawCallProgram);
+        glUniform3f(glGetUniformLocation(program, "cameraPos"), cameraPos.x, cameraPos.y,
+                    cameraPos.z);
+        glUniformMatrix3fv(glGetUniformLocation(program, "cameraRotation"), 1, GL_FALSE,
+                           glm::value_ptr(cameraRotation));
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         glfwSwapBuffers(window);
         glfwPollEvents();
         frameCount++;
-        checkGLError("(main) glDrawElements");
     }
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
-    glDeleteProgram(drawCallProgram);
+    glDeleteProgram(program);
     std::cout << "Average FPS: " << frameCount / (glfwGetTime() - startTime) << "\n";
     glfwTerminate();
     return 0;
