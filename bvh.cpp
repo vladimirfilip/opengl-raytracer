@@ -83,12 +83,14 @@ static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, i
     auto* res = new BVHNode();
     res->id = n++;
     res->isLeaf = (end - start + 1) <= MAX_BVH_LEAF_TRIANGLE_COUNT || depth == MAX_BVH_DEPTH;
+    if (depth == MAX_BVH_DEPTH) {
+        std::cout << "MAX BVH DEPTH REACHED" << std::endl;
+    }
     for (int i = start; i <= end; i++) {
         addTriangle(res, triangleData[i]);
     }
     if (!res->isLeaf) {
         SplitInfo info = getSplit(res, triangleData, start, end);
-        std::cout << "SPLITTING ON " << info.axis << " AT VALUE " << info.splitVal << std::endl;
         int numOnLeft = 0;
         for (int i = start; i <= end; i++) {
             if (triangleData[i][0][info.axis] < info.splitVal) {

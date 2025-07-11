@@ -15,7 +15,7 @@
  * is imported from https://learnopengl.com/Getting-started/Hello-Triangle
  */
 
-static glm::vec3 cameraPos(0.0f, 1.5f, -5.0f);
+static glm::vec3 cameraPos = CAMERA_START_POS;
 static glm::mat3 cameraRotation;
 static double cameraPitch = 0.0f, cameraYaw = 0.0f;
 static double prevMouseX, prevMouseY;
@@ -117,7 +117,6 @@ int main() {
     GLuint program = generateProgram(vertexShader, fragmentShader);
     GLint count;
     glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
-    std::cout << "Active uniforms: " << count << std::endl;
     GLint success = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (success == GL_FALSE) {
@@ -135,7 +134,6 @@ int main() {
     glUseProgram(program);
     glUniform1f(glGetUniformLocation(program, "u_ScreenWidth"),
                 static_cast<GLfloat>(screenWidth));
-    std::cout << glGetUniformLocation(program, "u_ScreenWidth") << std::endl;
     checkGLError("(raytraceInit) set screenWidth");
     glUniform1f(glGetUniformLocation(program, "u_ScreenHeight"),
                 static_cast<GLfloat>(screenHeight));

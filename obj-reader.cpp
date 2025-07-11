@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <regex>
 
 #define VERTEX_TYPE "v"
 #define FACE_TYPE "f"
@@ -15,7 +16,7 @@ ObjContents *readObjContents(const std::string& filePath) {
     auto *res = new ObjContents();
     res->vertices = std::vector<glm::vec3>();
     res->triangles = std::vector<glm::uvec3>();
-    GLuint i1, i2, i3;
+    GLuint i1, i2, i3, a, b, c;
     GLfloat x, y, z;
     std::string line;
     while (std::getline(fin, line)) {
@@ -30,8 +31,11 @@ ObjContents *readObjContents(const std::string& filePath) {
             if (!(iss >> x >> y >> z)) continue; // skip malformed line
             res->vertices.emplace_back(x, y, z);
         } else if (type == FACE_TYPE) {
-            if (!(iss >> i1 >> i2 >> i3)) continue; // skip malformed line
-            res->triangles.emplace_back(--i1, --i2, --i3);
+            if (sscanf(line.c_str(), "f %d//%d %d//%d %d//%d", &i1, &a, &i2, &b, &i3, &c) == 6) {
+                res->triangles.emplace_back(--i1, --i2, --i3);
+            } else if (sscanf(line.c_str(), "f %d %d %d", &i1, &i2, &i3) == 3) {
+                res->triangles.emplace_back(--i1, --i2, --i3);
+            }
         }
     }
     return res;
