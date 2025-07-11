@@ -93,6 +93,9 @@ HitInfo getHitInfo(Ray ray) {
     HitInfo info;
     info.dist = INFINITY;
     info.triangleIndex = -1;
+    if (rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]) == INFINITY) {
+        return info;
+    }
     /* Old code, loop over all triangles
         for (int i = 0; i < triangles.length(); i++) {
             float triangleDist = getRayTriangleDistance(ray, i);
@@ -108,9 +111,6 @@ HitInfo getHitInfo(Ray ray) {
     stack[0] = 0;
     while (i > -1) {
         int bvhIndex = stack[i--];
-        if (rayBoundingBoxDist(ray, bvh[bvhIndex][0], bvh[bvhIndex][1]) >= info.dist) {
-            continue;
-        }
         bool isLeaf = abs(bvh[bvhIndex][2].x - 1.0f) <= EPS;
         if (isLeaf) {
             int triangleStart = int(bvh[bvhIndex][2].y);
@@ -129,17 +129,17 @@ HitInfo getHitInfo(Ray ray) {
             float d1 = rayBoundingBoxDist(ray, bvh[child1][0], bvh[child1][1]);
             float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
             if (d1 < d2) {
-                if (d1 < info.dist) {
+                if (d1 < INFINITY) {
                     stack[++i] = child1;
                 }
-                if (d2 < info.dist) {
+                if (d2 < INFINITY) {
                     stack[++i] = child2;
                 }
             } else {
-                if (d2 < info.dist) {
+                if (d2 < INFINITY) {
                     stack[++i] = child2;
                 }
-                if (d1 < info.dist) {
+                if (d2 < INFINITY) {
                     stack[++i] = child1;
                 }
             }

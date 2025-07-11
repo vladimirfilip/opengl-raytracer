@@ -35,32 +35,45 @@ static float getSA(glm::vec3 min, glm::vec3 max) {
         dimensions.y * dimensions.z);
 }
 
+float getSplitCost(std::vector<glm::mat4x3>& triangleData, int start, int end, int axis, float splitVal) {
+    glm::vec3 leftMin = MAX_VERTEX, rightMin = MAX_VERTEX, leftMax = MIN_VERTEX, rightMax = MIN_VERTEX;
+    float numLeft = 0, numRight = 0;
+    for (int j = start; j <= end; j++) {
+        if (triangleData[j][0][axis] < splitVal) {
+            leftMin = min(leftMin, triangleData[j][1]);
+            leftMax = max(leftMax, triangleData[j][2]);
+            numLeft++;
+        } else {
+            rightMin = min(rightMin, triangleData[j][1]);
+            rightMax = max(rightMax, triangleData[j][2]);
+            numRight++;
+        }
+    }
+    leftMax = max(leftMax, leftMin);
+    rightMax = max(rightMax, rightMin);
+    return 1.0f + 2.0f * numLeft * getSA(leftMin, leftMax) + 2.0f * numRight * getSA(rightMin, rightMax);
+}
+
 SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
     SplitInfo info{0, 0.0f, INFINITY};
     for (int axis = 0; axis < 3; axis++) {
         float minVal = node->minCorner[axis];
         float maxVal = node->maxCorner[axis];
-        float splitDelta = (maxVal - minVal) / (float) (BVH_SPLIT_TESTS_PER_AXIS + 1);
-        for (int i = 0; i < BVH_SPLIT_TESTS_PER_AXIS; i++) {
-            float splitVal = minVal + splitDelta * (float) (i + 1);
-            glm::vec3 leftMin = MAX_VERTEX, rightMin = MAX_VERTEX, leftMax = MIN_VERTEX, rightMax = MIN_VERTEX;
-            float numLeft = 0, numRight = 0;
-            for (int j = start; j <= end; j++) {
-                if (triangleData[j][0][axis] < splitVal) {
-                    leftMin = min(leftMin, triangleData[j][1]);
-                    leftMax = max(leftMax, triangleData[j][2]);
-                    numLeft++;
-                } else {
-                    rightMin = min(rightMin, triangleData[j][1]);
-                    rightMax = max(rightMax, triangleData[j][2]);
-                    numRight++;
-                }
+        float minDiff = 1e-6;
+        for (int i = 0; i < BVH_SPLIT_ITERATIONS && abs(minVal - maxVal) > minDiff; i++) {
+            float third = (maxVal - minVal) / 3.0f;
+            float val1 = minVal + third, val2 = maxVal - third;
+            float cost1 = getSplitCost(triangleData, start, end, axis, val1), cost2 = getSplitCost(triangleData, start, end, axis, val2);
+            if (cost1 <= cost2) {
+                maxVal = val2;
             }
-            leftMax = max(leftMax, leftMin);
-            rightMax = max(rightMax, rightMin);
-            float cost = 1.0f + 2.0f * numLeft * getSA(leftMin, leftMax) + 2.0f * numRight * getSA(rightMin, rightMax);
-            info = min(info, SplitInfo{axis, splitVal, cost});
+            if (cost2 <= cost1) {
+                minVal = val1;
+            }
         }
+        float splitVal = (minVal + maxVal) / 2.0f;
+        float cost = getSplitCost(triangleData, start, end, axis, splitVal);
+        info = min(info, {axis, splitVal, cost});
     }
     assert(info.cost < INFINITY);
     return info;

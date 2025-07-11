@@ -14,6 +14,6 @@ const unsigned int RAYS_PER_PIXEL = 5;
 const float CAMERA_MOVE_SPEED = 3.0f;
 const int MAX_BVH_LEAF_TRIANGLE_COUNT = 4;
 const int MAX_BVH_DEPTH = 32;
-const int BVH_SPLIT_TESTS_PER_AXIS = 50;
+const int BVH_SPLIT_ITERATIONS = 100;
 
 #endif //OPENGL_RAYTRACER_CONSTANTS_H
