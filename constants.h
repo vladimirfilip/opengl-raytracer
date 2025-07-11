@@ -4,8 +4,9 @@
 #define TRIANGLE_SSBO_BINDING 1
 #define TRIANGLE_NORMAL_SSBO_BINDING 2
 #define BVH_BINDING 3
+#define TRIANGLE_COLOUR_SSBO_BINDING 4
 
-#define SCENE_FILE_PATH "../models/Dragon_8K.obj"
+#define SCENE_FILE_PATH "../models/teapot.obj"
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2

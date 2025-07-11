@@ -1,20 +1,17 @@
 #include "raytrace.h"
 
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <numbers>
 #include <iostream>
 #include <vector>
+#include <random>
 
 #include "constants.h"
 #include "util.h"
 #include "obj-reader.h"
 #include "bvh.h"
-
-static int screenWidth, screenHeight;
 
 template<typename T>
 void initSSBO(std::vector<T> &data, unsigned int binding) {
@@ -66,6 +63,15 @@ void initBuffers() {
     }
     initSSBO(alignedTriangles, TRIANGLE_SSBO_BINDING);
     free(contents);
+    std::vector<glm::vec4> triangleColours(triangles.size());
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    for (int i = 0; i < triangles.size(); i++) {
+        triangleColours[i] = glm::vec4(dist(gen)
+                , dist(gen), dist(gen), 1.0f);
+    }
+    initSSBO(triangleColours, TRIANGLE_COLOUR_SSBO_BINDING);
     std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
     GLuint normalShader = importAndCompileShader("../shaders/normals.glsl", GL_COMPUTE_SHADER);

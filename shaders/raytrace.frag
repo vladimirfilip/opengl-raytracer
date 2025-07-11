@@ -32,6 +32,11 @@ layout(std430, binding = 3) buffer BVHBuffer {
     mat3 bvh[];
 };
 
+layout(std430, binding = 4) buffer TriangleColourBuffer {
+    vec4 triangleColours[];
+};
+
+
 struct HitInfo {
     float dist;
     int triangleIndex;
@@ -122,10 +127,15 @@ HitInfo getHitInfo(Ray ray) {
         return info;
     */
     int stack[MAX_BVH_TRAVERSAL_STACK_SIZE];
+    float dist[MAX_BVH_TRAVERSAL_STACK_SIZE];
     int i = 0;
     stack[0] = 0;
+    dist[0] = rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]);
     while (i > -1) {
-        int bvhIndex = stack[i--];
+        int bvhIndex = stack[i];
+        if (dist[i--] >= info.dist) {
+            continue;
+        }
         bool isLeaf = abs(bvh[bvhIndex][2].x - 1.0f) <= EPS;
         if (isLeaf) {
             int triangleStart = int(bvh[bvhIndex][2].y);
@@ -136,7 +146,6 @@ HitInfo getHitInfo(Ray ray) {
                 if (triangleDist < info.dist) {
                     info.dist = triangleDist;
                     info.triangleIndex = i;
-                    return info;
                 }
             }
         } else {
@@ -146,18 +155,22 @@ HitInfo getHitInfo(Ray ray) {
             float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
             numBoxTests += 2;
             if (d1 < d2) {
+                if (d2 < INFINITY) {
+                    stack[++i] = child2;
+                    dist[i] = d2;
+                }
                 if (d1 < INFINITY) {
                     stack[++i] = child1;
-                }
-                if (d2 < INFINITY) {
-                    stack[++i] = child2;
+                    dist[i] = d1;
                 }
             } else {
-                if (d2 < INFINITY) {
-                    stack[++i] = child2;
+                if (d1 < INFINITY) {
+                    stack[++i] = child1;
+                    dist[i] = d1;
                 }
                 if (d2 < INFINITY) {
-                    stack[++i] = child1;
+                    stack[++i] = child2;
+                    dist[i] = d2;
                 }
             }
         }
@@ -167,7 +180,7 @@ HitInfo getHitInfo(Ray ray) {
 
 vec4 getColour(Ray ray, uint bouncesLeft) {
     HitInfo info = getHitInfo(ray);
-    return info.dist < INFINITY ? WHITE : BLACK;
+    return info.dist < INFINITY ? triangleColours[info.triangleIndex] : BLACK;
 }
 
 out vec4 FragColor;
