@@ -14,21 +14,15 @@ uniform uint u_RaysPerPixel;
 uniform vec3 cameraPos;
 uniform mat3 cameraRotation;
 
-layout(std430, binding = 0) buffer VertexBuffer {
-    vec3 vertices[];
-};
-
 layout(std430, binding = 1) buffer TriangleBuffer {
-    uvec3 triangles[];
+    mat3 triangles[];
 };
 
 layout(std430, binding = 2) buffer NormalsBuffer {
     vec3 triangleNormals[];
 };
 
-layout(binding = 3, rgba32f) uniform image2D pixelOutput;
-
-layout(std430, binding = 4) buffer BVHBuffer {
+layout(std430, binding = 3) buffer BVHBuffer {
     mat3 bvh[];
 };
 
@@ -46,26 +40,39 @@ const float EPS = 1e-6;
 /*
  * Gets distance the ray has to travel before hitting the triangle
  * distance = INFINITY if ray does not intersect
+ * Uses well-known Möller-Trumbore algorithm
+ * https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
  */
 float getRayTriangleDistance(Ray ray, int triangleIndex) {
-    vec3 a = vertices[triangles[triangleIndex].x];
-    vec3 b = vertices[triangles[triangleIndex].y];
-    vec3 c = vertices[triangles[triangleIndex].z];
-    vec3 n = triangleNormals[triangleIndex];
-    float denom = dot(ray.dir, n);
-    if (abs(denom) < EPS)
-    return INFINITY;
-    float alpha = dot(a - ray.origin, n) / denom;
-    if (alpha <= EPS)
-    return INFINITY;
-    // x = point on the ray that intersects the plane of the triangle
-    vec3 x = ray.origin + alpha * ray.dir;
-    // x is inside the triangle if sum of areas of triangles formed by x and each pair of triangle vertices equals
-    // the area of the triangle
-    float area = length(cross(x - a, x - b)) + length(cross(x - b, x - c)) + length(cross(x - c, x - a));
-    if (abs(area - length(n)) >= EPS)
-    return INFINITY;
-    return alpha;
+    vec3 a = triangles[triangleIndex][0];
+    vec3 b = triangles[triangleIndex][1];
+    vec3 c = triangles[triangleIndex][2];
+
+    vec3 edge1 = b - a;
+    vec3 edge2 = c - a;
+    vec3 ray_cross_e2 = cross(ray.dir, edge2);
+    float det = dot(edge1, ray_cross_e2);
+
+    if (abs(det) < EPS)
+        return INFINITY;    // This ray is parallel to this triangle.
+
+    float inv_det = 1.0 / det;
+    vec3 s = ray.origin - a;
+    float u = inv_det * dot(s, ray_cross_e2);
+
+    if ((u < 0 && abs(u) > EPS) || (u > 1 && abs(u-1) > EPS))
+        return INFINITY;
+
+    vec3 s_cross_e1 = cross(s, edge1);
+    float v = inv_det * dot(ray.dir, s_cross_e1);
+
+    if ((v < 0 && abs(v) > EPS) || (u + v > 1 && abs(u + v - 1) > EPS))
+        return INFINITY;
+
+    // At this stage we can compute t to find out where the intersection point is on the line.
+    float t = inv_det * dot(edge2, s_cross_e1);
+
+    return t > EPS ? t : INFINITY;
 }
 
 // Thanks to https://tavianator.com/2011/ray_box.html

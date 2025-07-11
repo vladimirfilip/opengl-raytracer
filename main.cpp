@@ -7,7 +7,6 @@
 #include "util.h"
 #include "raytrace.h"
 #include "constants.h"
-#include "obj-reader.h"
 #include "bvh.h"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -16,7 +15,7 @@
  * is imported from https://learnopengl.com/Getting-started/Hello-Triangle
  */
 
-static glm::vec3 cameraPos(0.0f, 0.0f, 0.0f);
+static glm::vec3 cameraPos(0.0f, 1.5f, -5.0f);
 static glm::mat3 cameraRotation;
 static double cameraPitch = 0.0f, cameraYaw = 0.0f;
 static double prevMouseX, prevMouseY;

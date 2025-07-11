@@ -66,12 +66,15 @@ void initBuffers() {
         glm::vec4(bvhNodes[i][2], 0.0f) };
     }
     initSSBO(alignedBVHNodes, BVH_BINDING);
-    std::vector<glm::vec4> triangleVertices4(triangleVertices.size());
-    for (int i = 0; i < triangleVertices.size(); i++) triangleVertices4[i] = glm::vec4(triangleVertices[i], 0.0f);
-    std::vector<glm::uvec4> triangles4(triangles.size());
-    for (int i = 0; i < triangles.size(); i++) triangles4[i] = glm::uvec4(triangles[i], 0);
-    initSSBO(triangleVertices4, VERTEX_SSBO_BINDING);
-    initSSBO(triangles4, TRIANGLE_SSBO_BINDING);
+    std::vector<AlignedMat3> alignedTriangles(triangles.size());
+    for (int i = 0; i < alignedTriangles.size(); i++) {
+        alignedTriangles[i] = AlignedMat3{
+            glm::vec4(triangleVertices[triangles[i].x], 0.0f),
+            glm::vec4(triangleVertices[triangles[i].y], 0.0f),
+            glm::vec4(triangleVertices[triangles[i].z], 0.0f)
+        };
+    }
+    initSSBO(alignedTriangles, TRIANGLE_SSBO_BINDING);
     free(contents);
     std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
