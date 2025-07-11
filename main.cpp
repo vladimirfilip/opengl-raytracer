@@ -21,6 +21,7 @@ static double cameraPitch = 0.0f, cameraYaw = 0.0f;
 static double prevMouseX, prevMouseY;
 static int screenWidth, screenHeight;
 static GLFWwindow* window;
+static int renderMode = RENDER_MODE;
 
 void processInput(double &prevTime);
 
@@ -163,6 +164,7 @@ int main() {
                     cameraPos.z);
         glUniformMatrix3fv(glGetUniformLocation(program, "cameraRotation"), 1, GL_FALSE,
                            glm::value_ptr(cameraRotation));
+        glUniform1ui(glGetUniformLocation(program, "renderMode"), renderMode);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -190,4 +192,10 @@ void processInput(double& prevTime) {
         cameraPos += cameraRotation * glm::vec3(-CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         cameraPos += cameraRotation * glm::vec3(CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+        renderMode = RENDER_MODE;
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+        renderMode = TRIANGLE_TEST_MODE;
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+        renderMode = BOX_TEST_MODE;
 }

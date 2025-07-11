@@ -5,6 +5,10 @@
 #define INFINITY 1.0 / 0.0
 #define MAX_BVH_TRAVERSAL_STACK_SIZE 128
 
+#define RENDER_MODE 1
+#define TRIANGLE_TEST_MODE 2
+#define BOX_TEST_MODE 3
+
 uniform float u_ScreenWidth;
 uniform float u_ScreenHeight;
 uniform float u_FOV;
@@ -13,6 +17,8 @@ uniform uint u_RayBounces;
 uniform uint u_RaysPerPixel;
 uniform vec3 cameraPos;
 uniform mat3 cameraRotation;
+
+uniform uint renderMode;
 
 layout(std430, binding = 1) buffer TriangleBuffer {
     mat3 triangles[];
@@ -34,6 +40,14 @@ struct HitInfo {
 struct Ray {
     vec3 origin, dir, invDir;
 };
+
+int numBoxTests = 0;
+int boxTestsMax = 1000;
+vec4 boxTestsColour = vec4(0.0f, 1.0f, 1.0f, 1.0f);
+
+int numTriangleTests = 0;
+int triangleTestsMax = 100;
+vec4 triangleTestsColour = vec4(1.0f, 1.0f, 0.0f, 0.0f);
 
 const float EPS = 1e-6;
 
@@ -93,6 +107,7 @@ HitInfo getHitInfo(Ray ray) {
     HitInfo info;
     info.dist = INFINITY;
     info.triangleIndex = -1;
+    numBoxTests++;
     if (rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]) == INFINITY) {
         return info;
     }
@@ -116,6 +131,7 @@ HitInfo getHitInfo(Ray ray) {
             int triangleStart = int(bvh[bvhIndex][2].y);
             int triangleEnd = int(bvh[bvhIndex][2].z);
             for (int i = triangleStart; i <= triangleEnd; i++) {
+                numTriangleTests++;
                 float triangleDist = getRayTriangleDistance(ray, i);
                 if (triangleDist < info.dist) {
                     info.dist = triangleDist;
@@ -128,6 +144,7 @@ HitInfo getHitInfo(Ray ray) {
             int child2 = int(bvh[bvhIndex][2].z);
             float d1 = rayBoundingBoxDist(ray, bvh[child1][0], bvh[child1][1]);
             float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
+            numBoxTests += 2;
             if (d1 < d2) {
                 if (d1 < INFINITY) {
                     stack[++i] = child1;
@@ -172,5 +189,10 @@ void main() {
         colour += getColour(ray, u_RayBounces);
     }
     colour /= u_RaysPerPixel;
+    if (renderMode == TRIANGLE_TEST_MODE) {
+        colour = float(min(triangleTestsMax, numTriangleTests)) / float(triangleTestsMax) * triangleTestsColour;
+    } else if (renderMode == BOX_TEST_MODE) {
+        colour = float(min(boxTestsMax, numBoxTests)) / float(boxTestsMax) * boxTestsColour;
+    }
     FragColor = colour;
 }
