@@ -51,7 +51,7 @@ int boxTestsMax = 1000;
 vec4 boxTestsColour = vec4(0.0f, 1.0f, 1.0f, 1.0f);
 
 int numTriangleTests = 0;
-int triangleTestsMax = 100;
+int triangleTestsMax = 500;
 vec4 triangleTestsColour = vec4(1.0f, 1.0f, 0.0f, 0.0f);
 
 const float EPS = 1e-6;
@@ -155,20 +155,20 @@ HitInfo getHitInfo(Ray ray) {
             float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
             numBoxTests += 2;
             if (d1 < d2) {
-                if (d2 < INFINITY) {
+                if (d2 < info.dist) {
                     stack[++i] = child2;
                     dist[i] = d2;
                 }
-                if (d1 < INFINITY) {
+                if (d1 < info.dist) {
                     stack[++i] = child1;
                     dist[i] = d1;
                 }
             } else {
-                if (d1 < INFINITY) {
+                if (d1 < info.dist) {
                     stack[++i] = child1;
                     dist[i] = d1;
                 }
-                if (d2 < INFINITY) {
+                if (d2 < info.dist) {
                     stack[++i] = child2;
                     dist[i] = d2;
                 }
@@ -180,7 +180,7 @@ HitInfo getHitInfo(Ray ray) {
 
 vec4 getColour(Ray ray, uint bouncesLeft) {
     HitInfo info = getHitInfo(ray);
-    return info.dist < INFINITY ? triangleColours[info.triangleIndex] : BLACK;
+    return info.dist < INFINITY ? WHITE * abs(dot(ray.dir, triangleNormals[info.triangleIndex])) : BLACK;
 }
 
 out vec4 FragColor;

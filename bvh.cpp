@@ -98,9 +98,14 @@ static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, i
                 numOnLeft++;
             }
         }
-        assert(0 < numOnLeft && numOnLeft <= end - start);
-        res->children[0] = generateBVH(triangleData, start, start + numOnLeft - 1, depth + 1);
-        res->children[1] = generateBVH(triangleData, start + numOnLeft, end, depth + 1);
+        if(!(0 < numOnLeft && numOnLeft <= end - start)) {
+            res->isLeaf = true;
+            res->triangleStart = start;
+            res->triangleEnd = end;
+        } else {
+            res->children[0] = generateBVH(triangleData, start, start + numOnLeft - 1, depth + 1);
+            res->children[1] = generateBVH(triangleData, start + numOnLeft, end, depth + 1);
+        }
     } else {
         res->triangleStart = start;
         res->triangleEnd = end;
