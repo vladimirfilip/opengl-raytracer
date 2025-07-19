@@ -13,6 +13,8 @@
 #include "obj-reader.h"
 #include "bvh.h"
 
+static GLuint raytraceProgram;
+
 template<typename T>
 void initSSBO(std::vector<T> &data, unsigned int binding) {
     GLuint ssbo;
@@ -78,7 +80,21 @@ void initBuffers() {
     runComputeShader(normalShader, (int) triangles.size(), 1, 1);
 }
 
-void raytraceInit(GLuint program) {
+GLuint raytraceInit() {
+    GLuint raytraceShader = importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER);
+    raytraceProgram = generateProgram(raytraceShader);
+    glUseProgram(raytraceProgram);
     initBuffers();
     checkGLError("(raytraceInit) initBuffers()");
+    return raytraceProgram;
 };
+
+void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation, int renderMode, int num_groups_x, int num_groups_y) {
+    glUseProgram(raytraceProgram);
+    glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
+                cameraPos.z);
+    glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE,
+                       glm::value_ptr(cameraRotation));
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "renderMode"), renderMode);
+    glDispatchCompute(num_groups_x, num_groups_y, 1);
+}

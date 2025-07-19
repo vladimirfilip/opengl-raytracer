@@ -1,5 +1,7 @@
 #version 430
 
+layout(local_size_x = 16, local_size_y = 16) in;
+
 #define WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
 #define BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
 #define INFINITY 1.0 / 0.0
@@ -36,6 +38,8 @@ layout(std430, binding = 4) buffer TriangleColourBuffer {
     vec4 triangleColours[];
 };
 
+layout(binding = 5, rgba32f) uniform image2D pixelOutput;
+
 
 struct HitInfo {
     float dist;
@@ -63,6 +67,7 @@ const float EPS = 1e-6;
  * https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
  */
 float getRayTriangleDistance(Ray ray, int triangleIndex) {
+    numTriangleTests++;
     vec3 a = triangles[triangleIndex][0];
     vec3 b = triangles[triangleIndex][1];
     vec3 c = triangles[triangleIndex][2];
@@ -96,6 +101,7 @@ float getRayTriangleDistance(Ray ray, int triangleIndex) {
 
 // Thanks to https://tavianator.com/2011/ray_box.html
 float rayBoundingBoxDist(Ray ray, vec3 boxMin, vec3 boxMax) {
+    numBoxTests++;
     vec3 tMin = (boxMin - ray.origin) * ray.invDir;
     vec3 tMax = (boxMax - ray.origin) * ray.invDir;
     vec3 t1 = min(tMin, tMax);
@@ -112,7 +118,6 @@ HitInfo getHitInfo(Ray ray) {
     HitInfo info;
     info.dist = INFINITY;
     info.triangleIndex = -1;
-    numBoxTests++;
     if (rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]) == INFINITY) {
         return info;
     }
@@ -141,7 +146,6 @@ HitInfo getHitInfo(Ray ray) {
             int triangleStart = int(bvh[bvhIndex][2].y);
             int triangleEnd = int(bvh[bvhIndex][2].z);
             for (int i = triangleStart; i <= triangleEnd; i++) {
-                numTriangleTests++;
                 float triangleDist = getRayTriangleDistance(ray, i);
                 if (triangleDist < info.dist) {
                     info.dist = triangleDist;
@@ -153,7 +157,6 @@ HitInfo getHitInfo(Ray ray) {
             int child2 = int(bvh[bvhIndex][2].z);
             float d1 = rayBoundingBoxDist(ray, bvh[child1][0], bvh[child1][1]);
             float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
-            numBoxTests += 2;
             if (d1 < d2) {
                 if (d2 < info.dist) {
                     stack[++i] = child2;
@@ -180,22 +183,23 @@ HitInfo getHitInfo(Ray ray) {
 
 vec4 getColour(Ray ray, uint bouncesLeft) {
     HitInfo info = getHitInfo(ray);
-    return info.dist < INFINITY ? WHITE * abs(dot(ray.dir, triangleNormals[info.triangleIndex])) : BLACK;
+    return info.dist < INFINITY ? triangleColours[info.triangleIndex] : BLACK;
 }
 
-out vec4 FragColor;
-
 void main() {
+    if (gl_GlobalInvocationID.x >= u_ScreenWidth || gl_GlobalInvocationID.y >= u_ScreenHeight) {
+        return;
+    }
     // tan (FOV / 2) = (viewportWidth / 2) / viewportDist
     float pixelWidth = tan(u_FOV / 2.0f) * u_ViewportDist * 2.0f / u_ScreenWidth;
     vec3 dir = cameraRotation * vec3(
-        (gl_FragCoord.x - u_ScreenWidth / 2.0f) * pixelWidth,
-        (gl_FragCoord.y - u_ScreenHeight / 2.0f) * pixelWidth,
+        (gl_GlobalInvocationID.x - u_ScreenWidth / 2.0f) * pixelWidth,
+        (gl_GlobalInvocationID.y - u_ScreenHeight / 2.0f) * pixelWidth,
         u_ViewportDist
     );
     Ray ray;
     ray.dir = normalize(dir);
-    ray.origin = cameraPos + dir;
+    ray.origin = cameraPos;
     ray.invDir = 1.0f / ray.dir;
     vec4 colour = BLACK;
     for (uint i = uint(0); i < u_RaysPerPixel; i++) {
@@ -207,5 +211,5 @@ void main() {
     } else if (renderMode == BOX_TEST_MODE) {
         colour = float(min(boxTestsMax, numBoxTests)) / float(boxTestsMax) * boxTestsColour;
     }
-    FragColor = colour;
+    imageStore(pixelOutput, ivec2(gl_GlobalInvocationID.xy), colour);
 }

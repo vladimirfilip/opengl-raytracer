@@ -5,7 +5,7 @@
 #include "glm/fwd.hpp"
 #include "glad/glad.h"
 
-extern void raytraceInit(GLuint program);
-extern void raytrace(GLuint program, glm::vec3 cameraPos, glm::mat3 cameraRotation);
+extern GLuint raytraceInit();
+extern void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation, int renderMode, int num_groups_x, int num_groups_y);
 
 #endif //OPENGL_RAYTRACER_RAYTRACE_H

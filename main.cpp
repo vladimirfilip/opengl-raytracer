@@ -83,7 +83,7 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
-    GLuint fragmentShader = importAndCompileShader("../shaders/raytrace.frag", GL_FRAGMENT_SHADER);
+    GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
 
     // set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -113,41 +113,53 @@ int main() {
     glEnableVertexAttribArray(0);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    checkGLError("(main) prior to program init");
+    checkGLError("(main) prior to drawProgram init");
     // link shaders
-    GLuint program = generateProgram(vertexShader, fragmentShader);
-    GLint count;
-    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
+    GLuint drawProgram = generateProgram(vertexShader, fragmentShader);
+    checkGLError("(main) generateProgram()");
     GLint success = 0;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    glGetProgramiv(drawProgram, GL_LINK_STATUS, &success);
     if (success == GL_FALSE) {
         // Linking failed, you can get the info log for details:
         GLint logLength = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+        glGetProgramiv(drawProgram, GL_INFO_LOG_LENGTH, &logLength);
 
         std::vector<GLchar> infoLog(logLength);
-        glGetProgramInfoLog(program, logLength, NULL, infoLog.data());
+        glGetProgramInfoLog(drawProgram, logLength, NULL, infoLog.data());
 
         // Print or log the error
-        std::cerr << "Shader program linking failed:\n" << infoLog.data() << std::endl;
+        std::cerr << "Shader drawProgram linking failed:\n" << infoLog.data() << std::endl;
     }
-    checkGLError("(main) generateProgram()");
-    glUseProgram(program);
-    glUniform1f(glGetUniformLocation(program, "u_ScreenWidth"),
+    glUseProgram(drawProgram);
+    GLuint outputTex;
+    glGenTextures(1, &outputTex);
+    glBindTexture(GL_TEXTURE_2D, outputTex);
+    checkGLError("(main) glGenTextures");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mode->width, mode->height, 0, GL_RGBA, GL_FLOAT,
+                 nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindImageTexture(PIXEL_OUTPUT_BINDING, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,
+                       GL_RGBA32F); // unit 0
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(drawProgram, "outputTexture"), 0);
+
+    GLuint raytraceProgram = raytraceInit();
+    glUseProgram(raytraceProgram);
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
                 static_cast<GLfloat>(screenWidth));
     checkGLError("(raytraceInit) set screenWidth");
-    glUniform1f(glGetUniformLocation(program, "u_ScreenHeight"),
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
                 static_cast<GLfloat>(screenHeight));
     checkGLError("(raytraceInit) set screenHeight");
-    glUniform1f(glGetUniformLocation(program, "u_FOV"),
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_FOV"),
                 static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
     checkGLError("(raytraceInit) set FOV");
-    glUniform1f(glGetUniformLocation(program, "u_ViewportDist"), VIEWPORT_DIST);
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"), VIEWPORT_DIST);
     checkGLError("(raytraceInit) set viewportDist");
-    glUniform1ui(glGetUniformLocation(program, "u_RaysPerPixel"), RAYS_PER_PIXEL);
-    glUniform1ui(glGetUniformLocation(program, "u_RayBounces"), RAY_BOUNCES);
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
     checkGLError("(raytraceInit) set uniforms");
-    raytraceInit(program);
     checkGLError("(main) after raytraceInit()");
     // render loop
     // -----------
@@ -155,16 +167,16 @@ int main() {
     double startTime = glfwGetTime();
     double prevTime = startTime;
     std::cout << "BEGAN RENDER LOOP" << std::endl;
-    glUseProgram(program);
+    glUseProgram(drawProgram);
     glfwGetCursorPos(window, &prevMouseX, &prevMouseY);
+    const int num_groups_x = (screenWidth + RAYTRACE_WORKGROUP_SIZE - 1) / RAYTRACE_WORKGROUP_SIZE;
+    const int num_groups_y = (screenHeight + RAYTRACE_WORKGROUP_SIZE - 1) / RAYTRACE_WORKGROUP_SIZE;
     while (!glfwWindowShouldClose(window)) {
         processInput(prevTime);
         updateCameraRotation();
-        glUniform3f(glGetUniformLocation(program, "cameraPos"), cameraPos.x, cameraPos.y,
-                    cameraPos.z);
-        glUniformMatrix3fv(glGetUniformLocation(program, "cameraRotation"), 1, GL_FALSE,
-                           glm::value_ptr(cameraRotation));
-        glUniform1ui(glGetUniformLocation(program, "renderMode"), renderMode);
+        raytrace(cameraPos, cameraRotation, renderMode, num_groups_x, num_groups_y);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glUseProgram(drawProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -173,7 +185,7 @@ int main() {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
-    glDeleteProgram(program);
+    glDeleteProgram(drawProgram);
     std::cout << "Average FPS: " << frameCount / (glfwGetTime() - startTime) << "\n";
     glfwTerminate();
     return 0;
