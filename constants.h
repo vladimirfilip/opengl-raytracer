@@ -7,7 +7,7 @@
 #define TRIANGLE_COLOUR_SSBO_BINDING 4
 #define PIXEL_OUTPUT_BINDING 5
 
-#define SCENE_FILE_PATH "../models/teapot.obj"
+#define SCENE_FILE_PATH "../models/Dragon_80K.obj"
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2
@@ -18,7 +18,7 @@ const float VIEWPORT_DIST = 0.1f;
 const unsigned int RAY_BOUNCES = 5;
 const unsigned int RAYS_PER_PIXEL = 5;
 const float CAMERA_MOVE_SPEED = 2.0f;
-const int MAX_BVH_LEAF_TRIANGLE_COUNT = 2;
+const int MAX_BVH_LEAF_TRIANGLE_COUNT = 4;
 const int MAX_BVH_DEPTH = 32;
 const int BVH_SPLIT_ITERATIONS = 20;
 const int RAYTRACE_WORKGROUP_SIZE = 16;

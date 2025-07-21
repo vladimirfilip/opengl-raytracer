@@ -174,7 +174,7 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         processInput(prevTime);
         updateCameraRotation();
-        raytrace(cameraPos, cameraRotation, renderMode, num_groups_x, num_groups_y);
+        raytrace(cameraPos, cameraRotation, renderMode, frameCount, num_groups_x, num_groups_y);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glUseProgram(drawProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);

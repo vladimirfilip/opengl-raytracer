@@ -89,12 +89,13 @@ GLuint raytraceInit() {
     return raytraceProgram;
 };
 
-void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation, int renderMode, int num_groups_x, int num_groups_y) {
+void raytrace(glm::vec3 cameraPos, glm::mat3 cameraRotation, int renderMode, int frameCount, int num_groups_x, int num_groups_y) {
     glUseProgram(raytraceProgram);
     glUniform3f(glGetUniformLocation(raytraceProgram, "cameraPos"), cameraPos.x, cameraPos.y,
                 cameraPos.z);
     glUniformMatrix3fv(glGetUniformLocation(raytraceProgram, "cameraRotation"), 1, GL_FALSE,
                        glm::value_ptr(cameraRotation));
     glUniform1ui(glGetUniformLocation(raytraceProgram, "renderMode"), renderMode);
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "frameCount"), frameCount);
     glDispatchCompute(num_groups_x, num_groups_y, 1);
 }
