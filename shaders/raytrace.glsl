@@ -41,7 +41,8 @@ layout(std430, binding = 4) buffer TriangleColourBuffer {
     vec4 triangleColours[];
 };
 
-layout(binding = 5, rgba32f) uniform image2D pixelOutput;
+layout(binding = 5, rgba32f) uniform image2D outputFrame;
+layout(binding = 6, rgba32f) uniform image2D prevFrame;
 
 
 struct HitInfo {
@@ -269,10 +270,12 @@ void main() {
         colour += getColour(ray, u_RayBounces);
     }
     colour /= u_RaysPerPixel;
+    vec4 accumulatedColour = imageLoad(prevFrame, ivec2(gl_GlobalInvocationID.xy));
+    vec4 finalColour = (accumulatedColour * frameCount + colour) / (frameCount + 1);
     if (renderMode == TRIANGLE_TEST_MODE) {
-        colour = float(min(triangleTestsMax, numTriangleTests)) / float(triangleTestsMax) * triangleTestsColour;
+        finalColour = float(min(triangleTestsMax, numTriangleTests)) / float(triangleTestsMax) * triangleTestsColour;
     } else if (renderMode == BOX_TEST_MODE) {
-        colour = float(min(boxTestsMax, numBoxTests)) / float(boxTestsMax) * boxTestsColour;
+        finalColour = float(min(boxTestsMax, numBoxTests)) / float(boxTestsMax) * boxTestsColour;
     }
-    imageStore(pixelOutput, ivec2(gl_GlobalInvocationID.xy), colour);
+    imageStore(outputFrame, ivec2(gl_GlobalInvocationID.xy), finalColour);
 }

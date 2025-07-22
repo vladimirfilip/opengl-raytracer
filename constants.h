@@ -5,9 +5,10 @@
 #define TRIANGLE_NORMAL_SSBO_BINDING 2
 #define BVH_BINDING 3
 #define TRIANGLE_COLOUR_SSBO_BINDING 4
-#define PIXEL_OUTPUT_BINDING 5
+#define CURR_FRAME_BINDING 5
+#define PREV_FRAME_BINDING 6
 
-#define SCENE_FILE_PATH "../models/Dragon_80K.obj"
+#define SCENE_FILE_PATH "../models/teapot.obj"
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2
@@ -16,7 +17,7 @@
 const float FOV = 90.0f;
 const float VIEWPORT_DIST = 0.1f;
 const unsigned int RAY_BOUNCES = 5;
-const unsigned int RAYS_PER_PIXEL = 5;
+const unsigned int RAYS_PER_PIXEL = 1;
 const float CAMERA_MOVE_SPEED = 2.0f;
 const int MAX_BVH_LEAF_TRIANGLE_COUNT = 4;
 const int MAX_BVH_DEPTH = 32;

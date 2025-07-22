@@ -22,6 +22,7 @@ static double prevMouseX, prevMouseY;
 static int screenWidth, screenHeight;
 static GLFWwindow* window;
 static int renderMode = RENDER_MODE;
+static bool clearAccumulatedFrames = false;
 
 void processInput(double &prevTime);
 
@@ -30,6 +31,9 @@ static void updateCameraRotation() {
     glfwGetCursorPos(window, &mouseX, &mouseY);
     double dx = mouseX - prevMouseX;
     double dy = mouseY - prevMouseY;
+    if (abs(dx) > 0.001f || abs(dy) > 0.001f) {
+        clearAccumulatedFrames = true;
+    }
     cameraPitch -= dy * std::numbers::pi / screenHeight;
     cameraYaw -= dx * std::numbers::pi / screenWidth;
     cameraPitch = std::max(-std::numbers::pi / 2.0f, std::min(std::numbers::pi / 2.0f, cameraPitch));
@@ -131,16 +135,17 @@ int main() {
         std::cerr << "Shader drawProgram linking failed:\n" << infoLog.data() << std::endl;
     }
     glUseProgram(drawProgram);
-    GLuint outputTex;
-    glGenTextures(1, &outputTex);
-    glBindTexture(GL_TEXTURE_2D, outputTex);
-    checkGLError("(main) glGenTextures");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mode->width, mode->height, 0, GL_RGBA, GL_FLOAT,
-                 nullptr);
+    GLuint currentFrame, prevFrame;
+    glGenTextures(1, &currentFrame);
+    glBindTexture(GL_TEXTURE_2D, currentFrame);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, screenWidth, screenHeight);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glBindImageTexture(PIXEL_OUTPUT_BINDING, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,
-                       GL_RGBA32F); // unit 0
+    glGenTextures(1, &prevFrame);
+    glBindTexture(GL_TEXTURE_2D, prevFrame);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, screenWidth, screenHeight);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(drawProgram, "outputTexture"), 0);
 
@@ -163,7 +168,7 @@ int main() {
     checkGLError("(main) after raytraceInit()");
     // render loop
     // -----------
-    int frameCount = 0;
+    int frameCount = 0, totalFrames = 0;
     double startTime = glfwGetTime();
     double prevTime = startTime;
     std::cout << "BEGAN RENDER LOOP" << std::endl;
@@ -172,21 +177,29 @@ int main() {
     const int num_groups_x = (screenWidth + RAYTRACE_WORKGROUP_SIZE - 1) / RAYTRACE_WORKGROUP_SIZE;
     const int num_groups_y = (screenHeight + RAYTRACE_WORKGROUP_SIZE - 1) / RAYTRACE_WORKGROUP_SIZE;
     while (!glfwWindowShouldClose(window)) {
+        clearAccumulatedFrames = false;
         processInput(prevTime);
         updateCameraRotation();
+        if (clearAccumulatedFrames)
+            frameCount = 0;
+        glBindImageTexture(CURR_FRAME_BINDING, currentFrame, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(PREV_FRAME_BINDING, prevFrame, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         raytrace(cameraPos, cameraRotation, renderMode, frameCount, num_groups_x, num_groups_y);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glBindTexture(GL_TEXTURE_2D, currentFrame);
         glUseProgram(drawProgram);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         glfwSwapBuffers(window);
+        std::swap(currentFrame, prevFrame);
         glfwPollEvents();
         frameCount++;
+        totalFrames++;
     }
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(drawProgram);
-    std::cout << "Average FPS: " << frameCount / (glfwGetTime() - startTime) << "\n";
+    std::cout << "Average FPS: " << totalFrames / (glfwGetTime() - startTime) << "\n";
     glfwTerminate();
     return 0;
 }
@@ -194,20 +207,36 @@ int main() {
 void processInput(double& prevTime) {
     double deltaTime = glfwGetTime() - prevTime;
     prevTime += deltaTime;
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         glfwSetWindowShouldClose(window, true);
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         cameraPos += cameraRotation * glm::vec3(0.0f, 0.0f, CAMERA_MOVE_SPEED * deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         cameraPos += cameraRotation * glm::vec3(0.0f, 0.0f, -CAMERA_MOVE_SPEED * deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         cameraPos += cameraRotation * glm::vec3(-CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         cameraPos += cameraRotation * glm::vec3(CAMERA_MOVE_SPEED * deltaTime, 0.0f, 0.0f);
-    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         renderMode = RENDER_MODE;
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         renderMode = TRIANGLE_TEST_MODE;
-    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
         renderMode = BOX_TEST_MODE;
+    }
 }
