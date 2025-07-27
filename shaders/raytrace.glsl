@@ -1,6 +1,6 @@
 #version 430
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 #define WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
 #define BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
@@ -142,7 +142,7 @@ HitInfo getHitInfo(Ray ray) {
     int i = 0;
     stack[0] = 0;
     dist[0] = rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]);
-    while (i > -1) {
+    while (i > -1 && info.dist > 1e-3) {
         int bvhIndex = stack[i];
         if (dist[i--] >= info.dist) {
             continue;

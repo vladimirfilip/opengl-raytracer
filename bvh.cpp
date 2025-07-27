@@ -55,7 +55,7 @@ float getSplitCost(std::vector<glm::mat4x3>& triangleData, int start, int end, i
 }
 
 SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
-    SplitInfo info{0, 0.0f, INFINITY};
+    SplitInfo info{-1, 0.0f, 2.0f * (float) (end - start + 1) * getSA(node->minCorner, node->maxCorner)};
     for (int axis = 0; axis < 3; axis++) {
         float minVal = node->minCorner[axis];
         float maxVal = node->maxCorner[axis];
@@ -63,7 +63,8 @@ SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int st
         for (int i = 0; i < BVH_SPLIT_ITERATIONS && abs(minVal - maxVal) > minDiff; i++) {
             float third = (maxVal - minVal) / 3.0f;
             float val1 = minVal + third, val2 = maxVal - third;
-            float cost1 = getSplitCost(triangleData, start, end, axis, val1), cost2 = getSplitCost(triangleData, start, end, axis, val2);
+            float cost1 = getSplitCost(triangleData, start, end, axis, val1);
+            float cost2 = getSplitCost(triangleData, start, end, axis, val2);
             if (cost1 <= cost2) {
                 maxVal = val2;
             }
@@ -82,15 +83,17 @@ SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int st
 static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, int end, int depth = 0) {
     auto* res = new BVHNode();
     res->id = n++;
-    res->isLeaf = (end - start + 1) <= MAX_BVH_LEAF_TRIANGLE_COUNT || depth == MAX_BVH_DEPTH;
-    if (depth == MAX_BVH_DEPTH) {
-        std::cout << "MAX BVH DEPTH REACHED" << std::endl;
-    }
+    res->isLeaf = depth == MAX_BVH_DEPTH;
     for (int i = start; i <= end; i++) {
         addTriangle(res, triangleData[i]);
     }
+    SplitInfo info;
     if (!res->isLeaf) {
-        SplitInfo info = getSplit(res, triangleData, start, end);
+        info = getSplit(res, triangleData, start, end);
+        if (info.axis == -1)
+            res->isLeaf = true;
+    }
+    if (!res->isLeaf) {
         int numOnLeft = 0;
         for (int i = start; i <= end; i++) {
             if (triangleData[i][0][info.axis] < info.splitVal) {
@@ -98,14 +101,9 @@ static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, i
                 numOnLeft++;
             }
         }
-        if(!(0 < numOnLeft && numOnLeft <= end - start)) {
-            res->isLeaf = true;
-            res->triangleStart = start;
-            res->triangleEnd = end;
-        } else {
-            res->children[0] = generateBVH(triangleData, start, start + numOnLeft - 1, depth + 1);
-            res->children[1] = generateBVH(triangleData, start + numOnLeft, end, depth + 1);
-        }
+        assert(0 < numOnLeft && numOnLeft <= end - start);
+        res->children[0] = generateBVH(triangleData, start, start + numOnLeft - 1, depth + 1);
+        res->children[1] = generateBVH(triangleData, start + numOnLeft, end, depth + 1);
     } else {
         res->triangleStart = start;
         res->triangleEnd = end;
