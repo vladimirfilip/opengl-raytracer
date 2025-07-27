@@ -92,28 +92,47 @@ void loadSharedBVH() {
             int nodeIndex = nodesToCheck[checkStart++];
             
             // Check if this node has children
-            bool isLeaf = abs(bvh[nodeIndex][2].x - 1.0f) <= EPS;
+            mat3 currentNode = bvh[nodeIndex];
+            bool isLeaf = abs(currentNode[2].x - 1.0f) <= EPS;
             if (!isLeaf) {
-                int child1 = int(bvh[nodeIndex][2].y);
-                int child2 = int(bvh[nodeIndex][2].z);
+                int child1 = int(currentNode[2].y);
+                int child2 = int(currentNode[2].z);
                 
-                // Add first child if we have space
+                // Add first child if we have space and haven't added it yet
                 if (sharedBVHCount < MAX_SHARED_BVH_NODES) {
-                    sharedBVH[sharedBVHCount] = bvh[child1];
-                    sharedBVHIndices[sharedBVHCount] = child1;
-                    sharedBVHCount++;
-                    if (checkEnd < MAX_SHARED_BVH_NODES) {
-                        nodesToCheck[checkEnd++] = child1;
+                    bool alreadyCached = false;
+                    for (int i = 0; i < sharedBVHCount; i++) {
+                        if (sharedBVHIndices[i] == child1) {
+                            alreadyCached = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyCached) {
+                        sharedBVH[sharedBVHCount] = bvh[child1];
+                        sharedBVHIndices[sharedBVHCount] = child1;
+                        sharedBVHCount++;
+                        if (checkEnd < MAX_SHARED_BVH_NODES) {
+                            nodesToCheck[checkEnd++] = child1;
+                        }
                     }
                 }
                 
-                // Add second child if we have space
+                // Add second child if we have space and haven't added it yet
                 if (sharedBVHCount < MAX_SHARED_BVH_NODES) {
-                    sharedBVH[sharedBVHCount] = bvh[child2];
-                    sharedBVHIndices[sharedBVHCount] = child2;
-                    sharedBVHCount++;
-                    if (checkEnd < MAX_SHARED_BVH_NODES) {
-                        nodesToCheck[checkEnd++] = child2;
+                    bool alreadyCached = false;
+                    for (int i = 0; i < sharedBVHCount; i++) {
+                        if (sharedBVHIndices[i] == child2) {
+                            alreadyCached = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyCached) {
+                        sharedBVH[sharedBVHCount] = bvh[child2];
+                        sharedBVHIndices[sharedBVHCount] = child2;
+                        sharedBVHCount++;
+                        if (checkEnd < MAX_SHARED_BVH_NODES) {
+                            nodesToCheck[checkEnd++] = child2;
+                        }
                     }
                 }
             }
