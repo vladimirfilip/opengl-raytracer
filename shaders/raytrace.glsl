@@ -6,6 +6,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 #define BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
 #define INFINITY 1.0 / 0.0
 #define MAX_BVH_TRAVERSAL_STACK_SIZE 128
+#define MAX_SHARED_BVH_NODES 16
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2
@@ -44,6 +45,11 @@ layout(std430, binding = 4) buffer TriangleColourBuffer {
 layout(binding = 5, rgba32f) uniform image2D outputFrame;
 layout(binding = 6, rgba32f) uniform image2D prevFrame;
 
+// Shared memory for BVH caching
+shared mat3 sharedBVH[MAX_SHARED_BVH_NODES];
+shared int sharedBVHIndices[MAX_SHARED_BVH_NODES];
+shared int sharedBVHCount;
+
 
 struct HitInfo {
     float dist;
@@ -65,6 +71,71 @@ vec4 triangleTestsColour = vec4(1.0f, 1.0f, 0.0f, 0.0f);
 #define PI 3.1415926
 
 const float EPS = 1e-6;
+
+// Cooperatively load top-level BVH nodes into shared memory
+void loadSharedBVH() {
+    // Only the first thread in the workgroup loads data
+    if (gl_LocalInvocationID.x == 0 && gl_LocalInvocationID.y == 0) {
+        sharedBVHCount = 0;
+        
+        // Always cache the root node (index 0)
+        sharedBVH[sharedBVHCount] = bvh[0];
+        sharedBVHIndices[sharedBVHCount] = 0;
+        sharedBVHCount++;
+        
+        // Load children breadth-first up to our limit
+        int nodesToCheck[MAX_SHARED_BVH_NODES];
+        int checkStart = 0, checkEnd = 1;
+        nodesToCheck[0] = 0;
+        
+        while (checkStart < checkEnd && sharedBVHCount < MAX_SHARED_BVH_NODES) {
+            int nodeIndex = nodesToCheck[checkStart++];
+            
+            // Check if this node has children
+            bool isLeaf = abs(bvh[nodeIndex][2].x - 1.0f) <= EPS;
+            if (!isLeaf) {
+                int child1 = int(bvh[nodeIndex][2].y);
+                int child2 = int(bvh[nodeIndex][2].z);
+                
+                // Add first child if we have space
+                if (sharedBVHCount < MAX_SHARED_BVH_NODES) {
+                    sharedBVH[sharedBVHCount] = bvh[child1];
+                    sharedBVHIndices[sharedBVHCount] = child1;
+                    sharedBVHCount++;
+                    if (checkEnd < MAX_SHARED_BVH_NODES) {
+                        nodesToCheck[checkEnd++] = child1;
+                    }
+                }
+                
+                // Add second child if we have space
+                if (sharedBVHCount < MAX_SHARED_BVH_NODES) {
+                    sharedBVH[sharedBVHCount] = bvh[child2];
+                    sharedBVHIndices[sharedBVHCount] = child2;
+                    sharedBVHCount++;
+                    if (checkEnd < MAX_SHARED_BVH_NODES) {
+                        nodesToCheck[checkEnd++] = child2;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Synchronize so all threads can access the shared data
+    barrier();
+}
+
+// Get BVH node data, checking shared memory first
+mat3 getBVHNode(int index) {
+    // Check if this node is in shared memory
+    for (int i = 0; i < sharedBVHCount; i++) {
+        if (sharedBVHIndices[i] == index) {
+            return sharedBVH[i];
+        }
+    }
+    
+    // Fall back to SSBO access
+    return bvh[index];
+}
 
 /*
  * Gets distance the ray has to travel before hitting the triangle
@@ -124,7 +195,8 @@ HitInfo getHitInfo(Ray ray) {
     HitInfo info;
     info.dist = INFINITY;
     info.triangleIndex = -1;
-    if (rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]) == INFINITY) {
+    mat3 rootNode = getBVHNode(0);
+    if (rayBoundingBoxDist(ray, rootNode[0], rootNode[1]) == INFINITY) {
         return info;
     }
     /* Old code, loop over all triangles
@@ -141,16 +213,17 @@ HitInfo getHitInfo(Ray ray) {
     float dist[MAX_BVH_TRAVERSAL_STACK_SIZE];
     int i = 0;
     stack[0] = 0;
-    dist[0] = rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]);
+    dist[0] = rayBoundingBoxDist(ray, rootNode[0], rootNode[1]);
     while (i > -1) {
         int bvhIndex = stack[i];
         if (dist[i--] >= info.dist) {
             continue;
         }
-        bool isLeaf = abs(bvh[bvhIndex][2].x - 1.0f) <= EPS;
+        mat3 currentNode = getBVHNode(bvhIndex);
+        bool isLeaf = abs(currentNode[2].x - 1.0f) <= EPS;
         if (isLeaf) {
-            int triangleStart = int(bvh[bvhIndex][2].y);
-            int triangleEnd = int(bvh[bvhIndex][2].z);
+            int triangleStart = int(currentNode[2].y);
+            int triangleEnd = int(currentNode[2].z);
             for (int i = triangleStart; i <= triangleEnd; i++) {
                 float triangleDist = getRayTriangleDistance(ray, i);
                 if (triangleDist < info.dist) {
@@ -159,10 +232,12 @@ HitInfo getHitInfo(Ray ray) {
                 }
             }
         } else {
-            int child1 = int(bvh[bvhIndex][2].y);
-            int child2 = int(bvh[bvhIndex][2].z);
-            float d1 = rayBoundingBoxDist(ray, bvh[child1][0], bvh[child1][1]);
-            float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
+            int child1 = int(currentNode[2].y);
+            int child2 = int(currentNode[2].z);
+            mat3 child1Node = getBVHNode(child1);
+            mat3 child2Node = getBVHNode(child2);
+            float d1 = rayBoundingBoxDist(ray, child1Node[0], child1Node[1]);
+            float d2 = rayBoundingBoxDist(ray, child2Node[0], child2Node[1]);
             if (d1 < d2) {
                 if (d2 < info.dist) {
                     stack[++i] = child2;
@@ -249,6 +324,9 @@ vec4 getColour(Ray ray, uint bouncesLeft) {
 }
 
 void main() {
+    // Load shared BVH nodes at the start of each workgroup
+    loadSharedBVH();
+    
     if (gl_GlobalInvocationID.x >= u_ScreenWidth || gl_GlobalInvocationID.y >= u_ScreenHeight) {
         return;
     }
