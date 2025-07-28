@@ -1,6 +1,6 @@
 #version 430
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 
 #define WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
 #define BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
@@ -10,6 +10,7 @@ layout(local_size_x = 32, local_size_y = 32) in;
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2
 #define BOX_TEST_MODE 3
+#define REFLECTIONS_TEST_MODE 4
 
 uniform float u_ScreenWidth;
 uniform float u_ScreenHeight;
@@ -25,9 +26,9 @@ uniform uint frameCount;
 
 uint randSeed;
 
-layout(std430, binding = 1) buffer TriangleBuffer {
-    mat3 triangles[];
-};
+layout(std430, binding = 7) buffer TriV0Buffer { vec4 triv0[]; };
+layout(std430, binding = 8) buffer TriV1Buffer { vec4 triv1[]; };
+layout(std430, binding = 9) buffer TriV2Buffer { vec4 triv2[]; };
 
 layout(std430, binding = 2) buffer NormalsBuffer {
     vec3 triangleNormals[];
@@ -62,6 +63,9 @@ int numTriangleTests = 0;
 int triangleTestsMax = 500;
 vec4 triangleTestsColour = vec4(1.0f, 1.0f, 0.0f, 0.0f);
 
+int numReflections = 0;
+vec4 reflectionTestsColour = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
 #define PI 3.1415926
 
 const float EPS = 1e-6;
@@ -74,9 +78,9 @@ const float EPS = 1e-6;
  */
 float getRayTriangleDistance(Ray ray, int triangleIndex) {
     numTriangleTests++;
-    vec3 a = triangles[triangleIndex][0];
-    vec3 b = triangles[triangleIndex][1];
-    vec3 c = triangles[triangleIndex][2];
+    vec3 a = triv0[triangleIndex].xyz;
+    vec3 b = triv1[triangleIndex].xyz;
+    vec3 c = triv2[triangleIndex].xyz;
 
     vec3 edge1 = b - a;
     vec3 edge2 = c - a;
@@ -147,10 +151,11 @@ HitInfo getHitInfo(Ray ray) {
         if (dist[i--] >= info.dist) {
             continue;
         }
-        bool isLeaf = abs(bvh[bvhIndex][2].x - 1.0f) <= EPS;
+        mat3 bvhNode = bvh[bvhIndex];
+        bool isLeaf = abs(bvhNode[2].x - 1.0f) <= EPS;
         if (isLeaf) {
-            int triangleStart = int(bvh[bvhIndex][2].y);
-            int triangleEnd = int(bvh[bvhIndex][2].z);
+            int triangleStart = int(bvhNode[2].y);
+            int triangleEnd = int(bvhNode[2].z);
             for (int i = triangleStart; i <= triangleEnd; i++) {
                 float triangleDist = getRayTriangleDistance(ray, i);
                 if (triangleDist < info.dist) {
@@ -159,10 +164,12 @@ HitInfo getHitInfo(Ray ray) {
                 }
             }
         } else {
-            int child1 = int(bvh[bvhIndex][2].y);
-            int child2 = int(bvh[bvhIndex][2].z);
-            float d1 = rayBoundingBoxDist(ray, bvh[child1][0], bvh[child1][1]);
-            float d2 = rayBoundingBoxDist(ray, bvh[child2][0], bvh[child2][1]);
+            int child1 = int(bvhNode[2].y);
+            int child2 = int(bvhNode[2].z);
+            mat3 child1Node = bvh[child1];
+            mat3 child2Node = bvh[child2];
+            float d1 = rayBoundingBoxDist(ray, child1Node[0], child1Node[1]);
+            float d2 = rayBoundingBoxDist(ray, child2Node[0], child2Node[1]);
             if (d1 < d2) {
                 if (d2 < info.dist) {
                     stack[++i] = child2;
@@ -240,10 +247,18 @@ vec4 getColour(Ray ray, uint bouncesLeft) {
             ray.origin += ray.dir * info.dist;
             vec3 normal = triangleNormals[info.triangleIndex];
             ray.dir = randDirectionInHemisphere(normal);
+
+            if (i > 2) { // Only after a few bounces
+                float continueProb = 0.8; // or base on rayColour/max(rayColour, ...)
+                if (rand() > continueProb)
+                    break;
+                rayColour /= continueProb;
+            }
         } else {
             result += sampleSkybox(ray.dir) * rayColour;
             break;
         }
+        numReflections++;
     }
     return vec4(result, 1.0f);
 }
@@ -276,6 +291,8 @@ void main() {
         finalColour = float(min(triangleTestsMax, numTriangleTests)) / float(triangleTestsMax) * triangleTestsColour;
     } else if (renderMode == BOX_TEST_MODE) {
         finalColour = float(min(boxTestsMax, numBoxTests)) / float(boxTestsMax) * boxTestsColour;
+    } else if (renderMode == REFLECTIONS_TEST_MODE) {
+        finalColour = float(min(u_RayBounces, numReflections) / float(u_RayBounces)) * reflectionTestsColour;
     }
     imageStore(outputFrame, ivec2(gl_GlobalInvocationID.xy), finalColour);
 }

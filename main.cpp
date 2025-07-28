@@ -239,4 +239,8 @@ void processInput(double& prevTime) {
         clearAccumulatedFrames = true;
         renderMode = BOX_TEST_MODE;
     }
+    if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
+        clearAccumulatedFrames = true;
+        renderMode = REFLECTIONS_TEST_MODE;
+    }
 }

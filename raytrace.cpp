@@ -22,7 +22,7 @@ void initSSBO(std::vector<T> &data, unsigned int binding) {
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glGenBuffers");
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBuffer");
-    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(T), data.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(T), data.data(), GL_STATIC_DRAW);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBufferData");
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo);
     checkGLError("(initSSBO, binding " + std::to_string(binding) + ") glBindBufferBase");
@@ -55,15 +55,16 @@ void initBuffers() {
         glm::vec4(bvhNodes[i][2], 0.0f) };
     }
     initSSBO(alignedBVHNodes, BVH_BINDING);
-    std::vector<AlignedMat3> alignedTriangles(triangles.size());
-    for (int i = 0; i < alignedTriangles.size(); i++) {
-        alignedTriangles[i] = AlignedMat3{
-            glm::vec4(triangleVertices[triangles[i].x], 0.0f),
-            glm::vec4(triangleVertices[triangles[i].y], 0.0f),
-            glm::vec4(triangleVertices[triangles[i].z], 0.0f)
-        };
+    const int numTriangles = (int) triangles.size();
+    std::vector<glm::vec4> triv0(numTriangles), triv1(numTriangles), triv2(numTriangles);
+    for (int i = 0; i < numTriangles; i++) {
+        triv0[i] = glm::vec4(triangleVertices[triangles[i].x], 0.0f);
+        triv1[i] = glm::vec4(triangleVertices[triangles[i].y], 0.0f);
+        triv2[i] = glm::vec4(triangleVertices[triangles[i].z], 0.0f);
     }
-    initSSBO(alignedTriangles, TRIANGLE_SSBO_BINDING);
+    initSSBO(triv0, TRI_V0_SSBO_BINDING);
+    initSSBO(triv1, TRI_V1_SSBO_BINDING);
+    initSSBO(triv2, TRI_V2_SSBO_BINDING);
     free(contents);
     std::vector<glm::vec4> triangleColours(triangles.size());
     std::random_device rd;

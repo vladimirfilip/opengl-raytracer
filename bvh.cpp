@@ -51,11 +51,11 @@ float getSplitCost(std::vector<glm::mat4x3>& triangleData, int start, int end, i
     }
     leftMax = max(leftMax, leftMin);
     rightMax = max(rightMax, rightMin);
-    return 1.0f + 2.0f * numLeft * getSA(leftMin, leftMax) + 2.0f * numRight * getSA(rightMin, rightMax);
+    return 1.0f + 50.0f * numLeft * getSA(leftMin, leftMax) + 50.0f * numRight * getSA(rightMin, rightMax);
 }
 
 SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
-    SplitInfo info{-1, 0.0f, 2.0f * (float) (end - start + 1) * getSA(node->minCorner, node->maxCorner)};
+    SplitInfo info{-1, 0.0f, 50.0f * (float) (end - start + 1) * getSA(node->minCorner, node->maxCorner)};
     for (int axis = 0; axis < 3; axis++) {
         float minVal = node->minCorner[axis];
         float maxVal = node->maxCorner[axis];
