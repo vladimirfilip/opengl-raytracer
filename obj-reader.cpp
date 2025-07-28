@@ -10,13 +10,28 @@
 #define FACE_TYPE "f"
 #define COMMENT_TYPE "#"
 
+char nextChar(std::istringstream& input) {
+    int c;
+    while ((c = input.peek()) != EOF && std::isspace(c)) input.get();
+    return (char) c;
+}
+
+bool charIs(std::istringstream& input, char c) {
+    char actual = nextChar(input);
+    if (actual == c) {
+        return false;
+    }
+    input >> actual;
+    return true;
+}
+
 ObjContents *readObjContents(const std::string& filePath) {
     std::ifstream fin(filePath);
     if (!fin) throw std::runtime_error("Could not open file: " + filePath);
     auto *res = new ObjContents();
     res->vertices = std::vector<glm::vec3>();
     res->triangles = std::vector<glm::uvec3>();
-    GLuint i1, i2, i3, a, b, c;
+    GLuint i1, i2, i3, a, b, c, x1, y1, z1;
     GLfloat x, y, z;
     std::string line;
     while (std::getline(fin, line)) {
@@ -31,10 +46,24 @@ ObjContents *readObjContents(const std::string& filePath) {
             if (!(iss >> x >> y >> z)) continue; // skip malformed line
             res->vertices.emplace_back(x, y, z);
         } else if (type == FACE_TYPE) {
-            if (sscanf(line.c_str(), "f %d//%d %d//%d %d//%d", &i1, &a, &i2, &b, &i3, &c) == 6) {
-                res->triangles.emplace_back(--i1, --i2, --i3);
-            } else if (sscanf(line.c_str(), "f %d %d %d", &i1, &i2, &i3) == 3) {
-                res->triangles.emplace_back(--i1, --i2, --i3);
+            std::vector<GLuint> vertexIndices;
+            GLuint i;
+            while ((iss >> i)) {
+                if (std::isspace(iss.peek())) {
+                    iss.get();
+                    continue;
+                }
+                vertexIndices.push_back(--i);
+                while (!charIs(iss, ' ')) {
+                    while (charIs(iss, '/'));
+                    if (charIs(iss, ' '))
+                        break;
+                    iss >> i;
+                }
+            }
+            assert(vertexIndices.size() <= 4);
+            for (int i = 0; i < vertexIndices.size() - 2; i++) {
+                res->triangles.emplace_back(vertexIndices[i], vertexIndices[i + 1], vertexIndices.back());
             }
         }
     }

@@ -11,7 +11,7 @@
 #define TRI_V1_SSBO_BINDING 8
 #define TRI_V2_SSBO_BINDING 9
 
-#define SCENE_FILE_PATH "../models/Dragon_80K.obj"
+#define SCENE_FILE_PATH "../models/sponza.obj"
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2

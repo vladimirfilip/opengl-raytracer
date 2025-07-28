@@ -238,20 +238,34 @@ vec3 randDirectionInHemisphere(vec3 normal) {
     return randomDirection;
 }
 
+vec3 randCosineDirection(vec3 normal) {
+    float r1 = rand();
+    float r2 = rand();
+    float phi = 2.0 * PI * r1;
+    float x = cos(phi) * sqrt(r2);
+    float y = sin(phi) * sqrt(r2);
+    float z = sqrt(1.0 - r2);
+    // Build local tangent basis
+    vec3 u = normalize(abs(normal.x) > 0.1 ? cross(normal, vec3(0,1,0)) : cross(normal, vec3(1,0,0)));
+    vec3 v = cross(normal, u);
+    return normalize(u * x + v * y + normal * z);
+}
+
 vec4 getColour(Ray ray, uint bouncesLeft) {
     vec3 rayColour = vec3(1.0);
     vec3 result = vec3(0.0);
     for (uint i = 0; i < bouncesLeft; i++) {
         HitInfo info = getHitInfo(ray);
         if (info.dist < INFINITY) {
-            ray.origin += ray.dir * info.dist;
             vec3 normal = triangleNormals[info.triangleIndex];
-            ray.dir = randDirectionInHemisphere(normal);
+            ray.origin += ray.dir * info.dist + normal * 1e-2; // Offset to avoid self-intersection
+            rayColour *= triangleColours[info.triangleIndex].rgb; // Albedo
+            ray.dir = randCosineDirection(normal);
 
+            // Russian roulette
             if (i > 2) {
                 float continueProb = 0.8;
-                if (rand() > continueProb)
-                    break;
+                if (rand() > continueProb) break;
                 rayColour /= continueProb;
             }
         } else {
@@ -260,9 +274,11 @@ vec4 getColour(Ray ray, uint bouncesLeft) {
         }
         numReflections++;
     }
+    // Always accumulate skybox if path didn't escape
+    if (result == vec3(0.0))
+        result += sampleSkybox(ray.dir) * rayColour;
     return vec4(result, 1.0f);
 }
-
 void main() {
     if (gl_GlobalInvocationID.x >= u_ScreenWidth || gl_GlobalInvocationID.y >= u_ScreenHeight) {
         return;
