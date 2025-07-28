@@ -248,8 +248,8 @@ vec4 getColour(Ray ray, uint bouncesLeft) {
             vec3 normal = triangleNormals[info.triangleIndex];
             ray.dir = randDirectionInHemisphere(normal);
 
-            if (i > 2) { // Only after a few bounces
-                float continueProb = 0.8; // or base on rayColour/max(rayColour, ...)
+            if (i > 2) {
+                float continueProb = 0.8;
                 if (rand() > continueProb)
                     break;
                 rayColour /= continueProb;
@@ -285,7 +285,8 @@ void main() {
         colour += getColour(ray, u_RayBounces);
     }
     colour /= u_RaysPerPixel;
-    vec4 accumulatedColour = imageLoad(prevFrame, ivec2(gl_GlobalInvocationID.xy));
+    ivec2 screenCoords = ivec2(gl_GlobalInvocationID.xy);
+    vec4 accumulatedColour = imageLoad(prevFrame, screenCoords);
     vec4 finalColour = (accumulatedColour * frameCount + colour) / (frameCount + 1);
     if (renderMode == TRIANGLE_TEST_MODE) {
         finalColour = float(min(triangleTestsMax, numTriangleTests)) / float(triangleTestsMax) * triangleTestsColour;
@@ -294,5 +295,5 @@ void main() {
     } else if (renderMode == REFLECTIONS_TEST_MODE) {
         finalColour = float(min(u_RayBounces, numReflections) / float(u_RayBounces)) * reflectionTestsColour;
     }
-    imageStore(outputFrame, ivec2(gl_GlobalInvocationID.xy), finalColour);
+    imageStore(outputFrame, screenCoords, finalColour);
 }

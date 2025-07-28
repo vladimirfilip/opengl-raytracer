@@ -24,7 +24,7 @@ const unsigned int RAY_BOUNCES = 5;
 const unsigned int RAYS_PER_PIXEL = 1;
 const float CAMERA_MOVE_SPEED = 2.0f;
 const int MAX_BVH_DEPTH = 32;
-const int BVH_SPLIT_ITERATIONS = 20;
+const int BVH_SPLIT_ITERATIONS = 64;
 const int RAYTRACE_WORKGROUP_SIZE = 16;
 
 const glm::vec3 CAMERA_START_POS(0.0f, 0.0f, -2.0f);

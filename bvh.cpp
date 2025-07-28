@@ -55,7 +55,7 @@ float getSplitCost(std::vector<glm::mat4x3>& triangleData, int start, int end, i
 }
 
 SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int start, int end) {
-    SplitInfo info{-1, 0.0f, 50.0f * (float) (end - start + 1) * getSA(node->minCorner, node->maxCorner)};
+    SplitInfo info = {-1, 0.0f, 50.0f * (float) (end - start + 1) * getSA(node->minCorner, node->maxCorner)};
     for (int axis = 0; axis < 3; axis++) {
         float minVal = node->minCorner[axis];
         float maxVal = node->maxCorner[axis];
@@ -79,6 +79,11 @@ SplitInfo getSplit(BVHNode* node, std::vector<glm::mat4x3>& triangleData, int st
     assert(info.cost < INFINITY);
     return info;
 }
+
+static int numLeaves = 0;
+static int minLeafSize = (int) 1e9;
+static int maxLeafSize = 0;
+static int totalLeafSize = 0;
 
 static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, int end, int depth = 0) {
     auto* res = new BVHNode();
@@ -107,6 +112,10 @@ static BVHNode* generateBVH(std::vector<glm::mat4x3>& triangleData, int start, i
     } else {
         res->triangleStart = start;
         res->triangleEnd = end;
+        numLeaves++;
+        minLeafSize = std::min(minLeafSize, end - start + 1);
+        maxLeafSize = std::max(maxLeafSize, end - start + 1);
+        totalLeafSize += end - start + 1;
     }
     return res;
 }
@@ -127,6 +136,11 @@ BVHNode* generateBVH(std::vector<glm::uvec3>& triangles, std::vector<glm::vec3>&
         triangles[i] = triangleData[i][3];
     }
     std::cout << "GENERATED " << n << " BVH NODES" << std::endl;
+    std::cout << "NUM LEAVES: " << numLeaves << std::endl;
+    std::cout << "MIN LEAF SIZE: " << minLeafSize << std::endl;
+    std::cout << "MAX LEAF SIZE: " << maxLeafSize << std::endl;
+    std::cout << "NUM TRIANGLES: " << totalLeafSize << std::endl;
+    std::cout << "AVERAGE LEAF SIZE: " << (float) totalLeafSize / (float) numLeaves << std::endl;
     return res;
 }
 

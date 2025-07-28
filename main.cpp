@@ -149,7 +149,9 @@ int main() {
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(drawProgram, "outputTexture"), 0);
 
+    double startTime = glfwGetTime();
     GLuint raytraceProgram = raytraceInit();
+    std::cout << "Raytracer initialised in " << glfwGetTime() - startTime << " seconds" << std::endl;
     glUseProgram(raytraceProgram);
     glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
                 static_cast<GLfloat>(screenWidth));
@@ -169,7 +171,7 @@ int main() {
     // render loop
     // -----------
     int frameCount = 0, totalFrames = 0;
-    double startTime = glfwGetTime();
+    startTime = glfwGetTime();
     double prevTime = startTime;
     std::cout << "BEGAN RENDER LOOP" << std::endl;
     glUseProgram(drawProgram);
