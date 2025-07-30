@@ -9,7 +9,6 @@
 #include "constants.h"
 #include "bvh.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "obj-reader.h"
 
 /*
  * Disclaimer: boilerplate to render two triangles on the screen

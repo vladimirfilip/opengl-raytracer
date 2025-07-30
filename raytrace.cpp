@@ -71,8 +71,8 @@ void initBuffers() {
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     for (int i = 0; i < triangles.size(); i++) {
-//        triangleColours[i] = glm::vec4(dist(gen), dist(gen), dist(gen), 1.0f);
-        triangleColours[i] = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        triangleColours[i] = glm::vec4(dist(gen)
+                , dist(gen), dist(gen), 1.0f);
     }
     initSSBO(triangleColours, TRIANGLE_COLOUR_SSBO_BINDING);
     std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
