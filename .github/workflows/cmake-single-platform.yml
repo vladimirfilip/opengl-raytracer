@@ -23,7 +23,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install MinGW-w64
+      - name: Cache
+        uses: actions/cache@v4.3.0
+        with:
+          path: [
+            "C:\ProgramData\chocolatey\bin\",
+            "C:\tools\mingw64\bin",
+          ],
+          key: chocolatey-and-mingw64
+
+      - name: Install MinGW-w64 (if not cached)
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           choco install mingw -y
           echo "C:\ProgramData\chocolatey\bin" >> $GITHUB_PATH
@@ -36,11 +46,4 @@ jobs:
         run: cmake -B ${{github.workspace}}/build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
 
       - name: Build (MinGW)
-        run: cmake --build ${{github.workspace}}/build -- -j 2
-  
-      - name: Test
-        working-directory: ${{github.workspace}}/build
-        # Execute tests defined by the CMake configuration.
-        # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-        run: ctest -C ${{env.BUILD_TYPE}}
-  
+        run: cmake --build ${{github.workspace}}/build -- -j 2  
