@@ -1,7 +1,6 @@
 #include "raytrace.h"
 
 #include <glad/glad.h>
-#include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
@@ -11,7 +10,6 @@
 #include "constants.h"
 #include "util.h"
 #include "obj-reader.h"
-#include "bvh.h"
 
 static GLuint raytraceProgram;
 
@@ -37,56 +35,43 @@ void runComputeShader(GLuint shader, int num_groups_x, int num_groups_y, int num
     glDeleteProgram(program);
 }
 
-struct AlignedMat3 {
-    glm::vec4 u, v, w;
-};
-
-void initBuffers() {
-    ObjContents *contents = readObjContents(SCENE_FILE_PATH);
-    std::vector<glm::vec3> triangleVertices = contents->vertices;
-    std::vector<glm::uvec3> triangles = contents->triangles;
-    auto bvh = generateBVH(triangles, triangleVertices);
-    auto bvhNodes = serialiseBVH(bvh);
-    std::vector<AlignedMat3> alignedBVHNodes(bvhNodes.size());
-    for (int i = 0; i < bvhNodes.size(); i++) {
-        alignedBVHNodes[i] = AlignedMat3{
-            glm::vec4(bvhNodes[i][0], 0.0f),
-            glm::vec4(bvhNodes[i][1], 0.0f),
-        glm::vec4(bvhNodes[i][2], 0.0f) };
-    }
-    initSSBO(alignedBVHNodes, BVH_BINDING);
-    const int numTriangles = (int) triangles.size();
-    std::vector<glm::vec4> triv0(numTriangles), triv1(numTriangles), triv2(numTriangles);
-    for (int i = 0; i < numTriangles; i++) {
-        triv0[i] = glm::vec4(triangleVertices[triangles[i].x], 0.0f);
-        triv1[i] = glm::vec4(triangleVertices[triangles[i].y], 0.0f);
-        triv2[i] = glm::vec4(triangleVertices[triangles[i].z], 0.0f);
-    }
-    initSSBO(triv0, TRI_V0_SSBO_BINDING);
-    initSSBO(triv1, TRI_V1_SSBO_BINDING);
-    initSSBO(triv2, TRI_V2_SSBO_BINDING);
-    free(contents);
-    std::vector<glm::vec4> triangleColours(triangles.size());
+void initBuffers(SceneData* sceneData) {
+    initSSBO(sceneData->alignedBVHNodes, BVH_BINDING);
+    initSSBO(sceneData->triv0, TRI_V0_SSBO_BINDING);
+    initSSBO(sceneData->triv1, TRI_V1_SSBO_BINDING);
+    initSSBO(sceneData->triv2, TRI_V2_SSBO_BINDING);
+    int numTriangles = sceneData->numTriangles;
+    std::vector<glm::vec4> triangleColours(numTriangles);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    for (int i = 0; i < triangles.size(); i++) {
+    for (int i = 0; i < numTriangles; i++) {
         triangleColours[i] = glm::vec4(dist(gen)
                 , dist(gen), dist(gen), 1.0f);
     }
     initSSBO(triangleColours, TRIANGLE_COLOUR_SSBO_BINDING);
-    std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(triangles.size());
+    std::vector<glm::vec4> triangleNormals = std::vector<glm::vec4>(numTriangles);
     initSSBO(triangleNormals, TRIANGLE_NORMAL_SSBO_BINDING);
     GLuint normalShader = importAndCompileShader("../shaders/normals.glsl", GL_COMPUTE_SHADER);
-    runComputeShader(normalShader, (int) triangles.size(), 1, 1);
+    runComputeShader(normalShader, numTriangles, 1, 1);
 }
 
-GLuint raytraceInit() {
+GLuint raytraceInit(SceneData* sceneData, int screenWidth, int screenHeight) {
     GLuint raytraceShader = importAndCompileShader("../shaders/raytrace.glsl", GL_COMPUTE_SHADER);
     raytraceProgram = generateProgram(raytraceShader);
     glUseProgram(raytraceProgram);
-    initBuffers();
+    initBuffers(sceneData);
     checkGLError("(raytraceInit) initBuffers()");
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
+                static_cast<GLfloat>(screenWidth));
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
+                static_cast<GLfloat>(screenHeight));
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_FOV"),
+                static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
+    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"), VIEWPORT_DIST);
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
+    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
+    checkGLError("(raytraceInit) set uniforms");
     return raytraceProgram;
 };
 

@@ -8,7 +8,6 @@
 #include "raytrace.h"
 #include "constants.h"
 #include "bvh.h"
-#include "glm/gtc/type_ptr.hpp"
 
 /*
  * Disclaimer: boilerplate to render two triangles on the screen
@@ -52,10 +51,64 @@ static void updateCameraRotation() {
     cameraRotation = yRotation * xRotation;
 }
 
+static std::pair<int, std::pair<int, int>> configScreenSpaceQuad() {
+    /*
+     * set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
+    */
+    float vertices[] = {1.0f, 1.0f, 0.0f,  // top right
+                        1.0f, -1.0f, 0.0f,  // bottom right
+                        -1.0f, -1.0f, 0.0f,  // bottom left
+                        -1.0f, 1.0f, 0.0f   // top left
+    };
+    unsigned int indices[] = {  // note that we start from 0!
+            0, 1, 3,  // first Triangle
+            1, 2, 3   // second Triangle
+    };
+    GLuint VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) nullptr);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+static GLuint generateScreenSpaceTexture() {
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F,
+                   screenWidth, screenHeight);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    return tex;
+}
+
+static void deleteGLEntities(std::pair<GLuint, std::pair<GLuint, GLuint>> vertexArrayAndBuffers,
+                             const std::vector<GLuint>& programs) {
+    glDeleteVertexArrays(1, &vertexArrayAndBuffers.first);
+    glDeleteBuffers(1, &vertexArrayAndBuffers.second.first);
+    glDeleteBuffers(1, &vertexArrayAndBuffers.second.second);
+    for (auto program : programs)
+        glDeleteProgram(program);
+    glfwTerminate();
+}
+
 int main() {
     std::ios_base::sync_with_stdio(false);
     std::cin.tie(nullptr);
     std::cout.tie(nullptr);
+    SceneData* sceneData = loadScene();
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -89,34 +142,7 @@ int main() {
     GLuint vertexShader = importAndCompileShader("../shaders/vertex.vert", GL_VERTEX_SHADER);
     GLuint fragmentShader = importAndCompileShader("../shaders/fragment.frag", GL_FRAGMENT_SHADER);
 
-    // set up screen-size quad vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    float vertices[] = {1.0f, 1.0f, 0.0f,  // top right
-                        1.0f, -1.0f, 0.0f,  // bottom right
-                        -1.0f, -1.0f, 0.0f,  // bottom left
-                        -1.0f, 1.0f, 0.0f   // top left
-    };
-    unsigned int indices[] = {  // note that we start from 0!
-            0, 1, 3,  // first Triangle
-            1, 2, 3   // second Triangle
-    };
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) nullptr);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    auto vertexArrayAndBuffers = configScreenSpaceQuad();
     checkGLError("(main) prior to drawProgram init");
     // link shaders
     GLuint drawProgram = generateProgram(vertexShader, fragmentShader);
@@ -135,38 +161,14 @@ int main() {
         std::cerr << "Shader drawProgram linking failed:\n" << infoLog.data() << std::endl;
     }
     glUseProgram(drawProgram);
-    GLuint currentFrame, prevFrame;
-    glGenTextures(1, &currentFrame);
-    glBindTexture(GL_TEXTURE_2D, currentFrame);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, screenWidth, screenHeight);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glGenTextures(1, &prevFrame);
-    glBindTexture(GL_TEXTURE_2D, prevFrame);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, screenWidth, screenHeight);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glActiveTexture(GL_TEXTURE0);
+    GLuint currentFrame = generateScreenSpaceTexture();
+    GLuint prevFrame = generateScreenSpaceTexture();
     glUniform1i(glGetUniformLocation(drawProgram, "outputTexture"), 0);
 
     double startTime = glfwGetTime();
-    GLuint raytraceProgram = raytraceInit();
+    GLuint raytraceProgram = raytraceInit(sceneData, screenWidth, screenHeight);
     std::cout << "Raytracer initialised in " << glfwGetTime() - startTime << " seconds" << std::endl;
     glUseProgram(raytraceProgram);
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenWidth"),
-                static_cast<GLfloat>(screenWidth));
-    checkGLError("(raytraceInit) set screenWidth");
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ScreenHeight"),
-                static_cast<GLfloat>(screenHeight));
-    checkGLError("(raytraceInit) set screenHeight");
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_FOV"),
-                static_cast<GLfloat>(FOV * std::numbers::pi / 180.f));
-    checkGLError("(raytraceInit) set FOV");
-    glUniform1f(glGetUniformLocation(raytraceProgram, "u_ViewportDist"), VIEWPORT_DIST);
-    checkGLError("(raytraceInit) set viewportDist");
-    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RaysPerPixel"), RAYS_PER_PIXEL);
-    glUniform1ui(glGetUniformLocation(raytraceProgram, "u_RayBounces"), RAY_BOUNCES);
-    checkGLError("(raytraceInit) set uniforms");
     checkGLError("(main) after raytraceInit()");
     // render loop
     // -----------
@@ -184,8 +186,10 @@ int main() {
         updateCameraRotation();
         if (clearAccumulatedFrames)
             frameCount = 0;
-        glBindImageTexture(CURR_FRAME_BINDING, currentFrame, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glBindImageTexture(PREV_FRAME_BINDING, prevFrame, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(CURR_FRAME_BINDING, currentFrame, 0, GL_FALSE,
+                           0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(PREV_FRAME_BINDING, prevFrame, 0, GL_FALSE,
+                           0, GL_READ_ONLY, GL_RGBA32F);
         raytrace(cameraPos, cameraRotation, renderMode, frameCount, num_groups_x, num_groups_y);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glBindTexture(GL_TEXTURE_2D, currentFrame);
@@ -197,12 +201,8 @@ int main() {
         frameCount++;
         totalFrames++;
     }
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-    glDeleteProgram(drawProgram);
     std::cout << "Average FPS: " << totalFrames / (glfwGetTime() - startTime) << "\n";
-    glfwTerminate();
+    deleteGLEntities(vertexArrayAndBuffers, {drawProgram, raytraceProgram});
     return 0;
 }
 

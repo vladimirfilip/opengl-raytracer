@@ -16,7 +16,9 @@ add_executable(opengl_raytracer
         obj-reader.cpp
         obj-reader.h
         bvh.cpp
-        bvh.h)
+        bvh.h
+        scene-loader.cpp
+        scene-loader.h)
 
 FetchContent_Declare(
         glm

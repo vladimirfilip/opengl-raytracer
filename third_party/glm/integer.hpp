@@ -128,7 +128,7 @@ namespace glm
 		int Bits);
 
 	/// Returns the reversal of the bits of value.
-	/// The bit numbered n of the result will be taken from bit (bits - 1) - n of value,
+	/// The bit numbered numNodesGenerated of the result will be taken from bit (bits - 1) - numNodesGenerated of value,
 	/// where bits is the total number of bits used to represent value.
 	///
 	/// @tparam L An integer between 1 and 4 included that qualify the dimension of the vector.

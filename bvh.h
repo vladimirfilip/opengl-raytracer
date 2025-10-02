@@ -16,9 +16,15 @@ struct BVHNode {
     BVHNode* children[2];
     int triangleStart, triangleEnd;
     bool isLeaf = false;
+    int treeSize = 1;
+
+    void addTriangle(glm::mat4x3& triangleData) {
+        minCorner = min(minCorner, triangleData[1]);
+        maxCorner = max(maxCorner, triangleData[2]);
+    }
 };
 
-extern BVHNode* generateBVH(std::vector<glm::uvec3>& triangles, std::vector<glm::vec3>& vertices);
+extern BVHNode* generateBVH(std::vector<glm::uvec3>& triangleVertexIndices, std::vector<glm::vec3>& vertices);
 
 extern std::vector<glm::mat3> serialiseBVH(BVHNode* node);
 

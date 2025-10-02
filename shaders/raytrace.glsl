@@ -68,7 +68,7 @@ vec4 reflectionTestsColour = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 #define PI 3.1415926
 
-const float EPS = 1e-6;
+const float EPS = 1e-4;
 
 /*
  * Gets distance the ray has to travel before hitting the triangle
@@ -119,8 +119,8 @@ float rayBoundingBoxDist(Ray ray, vec3 boxMin, vec3 boxMax) {
     float tNear = max(max(t1.x, t1.y), t1.z);
     float tFar = min(min(t2.x, t2.y), t2.z);
 
-    bool hit = tFar >= tNear && tFar > 0;
-    float dst = hit ? tNear > 0 ? tNear : 0 : INFINITY;
+    bool hit = tFar >= tNear && tFar > EPS;
+    float dst = hit ? tNear > EPS ? tNear : 0 : INFINITY;
     return dst;
 }
 
@@ -146,7 +146,7 @@ HitInfo getHitInfo(Ray ray) {
     int i = 0;
     stack[0] = 0;
     dist[0] = rayBoundingBoxDist(ray, bvh[0][0], bvh[0][1]);
-    while (i > -1 && info.dist > 1e-3) {
+    while (i > -1) {
         int bvhIndex = stack[i];
         if (dist[i--] >= info.dist) {
             continue;
@@ -246,7 +246,13 @@ vec4 getColour(Ray ray, uint bouncesLeft) {
         if (info.dist < INFINITY) {
             ray.origin += ray.dir * info.dist;
             vec3 normal = triangleNormals[info.triangleIndex];
+            if (dot(normal, ray.dir) > 0) {
+                normal = -normal;
+            }
+            // Diffuse reflection:
+            // ray.dir = normalize(normal - (ray.dir - normal));
             ray.dir = randDirectionInHemisphere(normal);
+            rayColour *= vec3(triangleColours[info.triangleIndex]);
 
             if (i > 2) {
                 float continueProb = 0.8;

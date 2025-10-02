@@ -11,7 +11,7 @@
 #define TRI_V1_SSBO_BINDING 8
 #define TRI_V2_SSBO_BINDING 9
 
-#define SCENE_FILE_PATH "../models/Dragon_80K.obj"
+#define SCENE_FILE_PATH "../models/teapot.obj"
 
 #define RENDER_MODE 1
 #define TRIANGLE_TEST_MODE 2
@@ -20,7 +20,7 @@
 
 const float FOV = 90.0f;
 const float VIEWPORT_DIST = 0.1f;
-const unsigned int RAY_BOUNCES = 5;
+const unsigned int RAY_BOUNCES = 100;
 const unsigned int RAYS_PER_PIXEL = 1;
 const float CAMERA_MOVE_SPEED = 2.0f;
 const int MAX_BVH_DEPTH = 32;
